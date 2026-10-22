@@ -13,7 +13,9 @@ llm_calls 는 실제 LLM 호출 수다. openai 는 HTTP 요청 수(파싱 재시
     ./.venv/bin/python3 eval/run_before_after.py --llm fake                  # 파이프라인 확인, 과금 없음
     ./.venv/bin/python3 eval/run_before_after.py --llm openai --dry-run      # 예상 호출 수·토큰만 출력
     ./.venv/bin/python3 eval/run_before_after.py --llm openai --reps 2       # 실측 (과금)
-옵션: --variants before,after[,after_rules]  --menu-repo mcp|local  --only case1,case3
+옵션: --variants before,after[,after_llm]  --menu-repo mcp|local  --only case1,case3
+      --reuse <runs.jsonl> (이전 실행 행을 다시 채점에 넣는다, 반복 가능)  --rename after=after_llm
+variant: before(노트북), after(REVIEW_MODE=rules, 기본), after_llm(REVIEW_MODE=llm).
       --control (before 를 재시작 없이 재방문한 before_norestart 행 추가)
 결과: eval/results/{날짜}_{tag}_runs.jsonl (전체 행), _rep{n}_single.jsonl / _rep{n}_revisit.jsonl
       (score_results.py 입력), _summary.md. 같은 이름이 있으면 시각을 붙여 새 파일로 만든다.
@@ -51,7 +53,8 @@ PRICE_IN, PRICE_OUT = 0.15, 0.60
 # fake 에서 출력 토큰을 셀 수 없어서 쓰는 추정치(op 별 응답 길이). dry-run 용.
 EST_OUT_TOKENS = {"route": 15, "extract": 90, "recommend": 250, "review": 90}
 # 실모델에서 한 요청이 칠 수 있는 최대 HTTP 호출 수(파싱 재시도 2배, 재추천 1회, 완화 2회 포함)
-MAX_CALLS = {"before": 2 + 2 * 2, "after": 2 + 2 + 2 * 2 + 2, "after_rules": 2 + 2 + 2 * 2}
+MAX_CALLS = {"before": 2 + 2 * 2, "after": 2 + 2 + 2 * 2, "after_llm": 2 + 2 + 2 * 2 + 2}
+REVIEW_MODE = {"after": "rules", "after_llm": "llm"}
 
 
 # ---------------------------------------------------------------- 입력·정답 라벨
@@ -108,6 +111,11 @@ class Meter:
 
 
 METER = Meter()
+CALL_LIMIT = None   # --max-calls. 넘으면 CallBudgetExceeded 로 전체 중단
+
+
+class CallBudgetExceeded(BaseException):
+    """실행별 except Exception 에 잡히지 않게 BaseException — 행 오류가 아니라 측정 중단이다."""
 
 
 def install_http_meter():
@@ -129,6 +137,8 @@ def install_http_meter():
             except Exception:
                 u = {}
             METER.add("http", u.get("prompt_tokens", 0), u.get("completion_tokens", 0))
+            if CALL_LIMIT is not None and METER.calls >= CALL_LIMIT:
+                raise CallBudgetExceeded(f"HTTP 호출 {METER.calls}회 — 상한 {CALL_LIMIT}")
             return resp
 
     mod.httpx = _Proxy()
@@ -418,17 +428,21 @@ def unique_stem(date: str, tag: str) -> str:
 
 def write_results(rows, args, stem):
     RESULTS.mkdir(parents=True, exist_ok=True)
+    order = ["before", "before_norestart", "after", "after_llm"]
+    rows = sorted(rows, key=lambda r: order.index(r["variant"]) if r["variant"] in order else len(order))
     runs_path = RESULTS / f"{stem}_runs.jsonl"
     runs_path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
     md = [f"# Before/After 채점 — {stem}", "",
           f"- 실행: `{' '.join(sys.argv)}`",
           f"- llm: {args.llm} ({'실측 아님, 파이프라인 확인용' if args.llm == 'fake' else f'{MODEL} / {QUALITY_MODEL}, temperature 0'})",
-          f"- variants: {args.variants}, menu_repo(after): {args.menu_repo}, reps: {args.reps}, 문장 {len({r['pair_id'] for r in rows})}개",
+          f"- variants(이번 실행): {args.variants or '없음'}, menu_repo(after): {args.menu_repo}, reps: {args.reps}, 문장 {len({r['pair_id'] for r in rows})}개",
+          *[f"- 재사용한 행: `{x}`" + (f" (variant 이름 바꿈 {args.rename})" if args.rename else "") for x in args.reuse],
+          f"- 채점 기준 메뉴 데이터: `{MENUS_JSON.relative_to(ROOT)}`",
           "- HITL 은 자동 승인. latency 는 invoke + resume 합. llm_calls 는 "
           + ("HTTP 호출 수(파싱 재시도 포함)." if args.llm == "openai" else "fake 메서드 호출 수."),
           "- 실패 행(status=error)은 채점 파일에서 빼고 보조 지표 errors 에 센다.",
           f"- 전체 행: `{runs_path.relative_to(ROOT)}`", ""]
-    for rep in range(1, args.reps + 1):
+    for rep in sorted({r["rep"] for r in rows}):
         for scen, title in (("single", "단일 요청 (seq 0, 새 사용자)"), ("revisit", "재방문 (재시작 후 seq 1)")):
             part = [r for r in rows if r["rep"] == rep and r["scenario"] == scen]
             if not part:
@@ -455,10 +469,13 @@ def main():
     ap.add_argument("--control", action="store_true", help="before_norestart 행 추가")
     ap.add_argument("--dry-run", action="store_true", help="fake 로 돌려 openai 예상 호출 수·토큰만 출력")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--max-calls", type=int, default=None, help="openai HTTP 호출 상한. 닿으면 중단")
+    ap.add_argument("--reuse", action="append", default=[], help="이전 _runs.jsonl 행을 함께 채점")
+    ap.add_argument("--rename", default="", help="재사용 행의 variant 이름 바꾸기. 예: after=after_llm")
     args = ap.parse_args()
     variants = [v.strip() for v in args.variants.split(",") if v.strip()]
     for v in variants:
-        if v not in ("before", "after", "after_rules"):
+        if v not in ("before", "after", "after_llm"):
             raise SystemExit(f"모르는 variant: {v}")
 
     all_by_id = {q["id"]: q for q in load_queries(None)}
@@ -470,11 +487,21 @@ def main():
         if not os.environ.get("OPENAI_API_KEY"):
             raise SystemExit("OPENAI_API_KEY 가 없다 (.env)")
         install_http_meter()
+        global CALL_LIMIT
+        CALL_LIMIT = args.max_calls
     else:
         os.environ["LANGCHAIN_TRACING_V2"] = "false"
         os.environ.pop("OPENAI_API_KEY", None)        # fake 실행이 실수로 과금되지 않게
 
     rows = []
+    renames = dict(x.split("=", 1) for x in args.rename.split(",") if x)
+    for path in args.reuse:
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                r = json.loads(line)
+                r["variant"] = renames.get(r["variant"], r["variant"])
+                r.setdefault("reused_from", str(path))
+                rows.append(r)
     for rep in range(1, args.reps + 1):
         for v in variants:
             t0 = time.perf_counter()
@@ -482,8 +509,8 @@ def main():
                 rows += run_before(queries, all_by_id, llm_kind, rep, args.control)
             else:
                 rows += asyncio.run(run_after(queries, all_by_id, llm_kind, rep, v,
-                                              "rules" if v == "after_rules" else "llm", args.menu_repo))
-            n = [r for r in rows if r["rep"] == rep and r["variant"].startswith(v)]
+                                              REVIEW_MODE[v], args.menu_repo))
+            n = [r for r in rows if r["rep"] == rep and r["variant"].startswith(v) and "reused_from" not in r]
             print(f"[rep {rep}] {v}: {len(n)}행, 오류 {sum(r['status'] == 'error' for r in n)}, "
                   f"{time.perf_counter() - t0:.1f}s", file=sys.stderr)
 
