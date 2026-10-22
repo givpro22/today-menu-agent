@@ -1,81 +1,79 @@
-"""all_total 통합 실습 — MCP Server (Wave 2 축).
+"""오늘뭐먹지 — MCP Server (Wave 2 축).
 
-Tool / Resource / Prompt 3대 capability를 모두 노출하는 실제 fastmcp 서버.
 FastAPI 백엔드(server.py)가 lifespan에서 이 파일을 subprocess(stdio)로 1회 기동해
 프로세스가 살아 있는 동안 재사용한다 (Wave 1 싱글턴 + Wave 2 표준화의 결합).
+그래프가 실제로 부르는 capability 만 노출한다(계약 §6-2).
 
-- Tool    get_monitoring_status : 호출마다 값이 달라지는 동적 조회 → Tool이 맞다
-- Resource runbook://incident-response/{incident_type} : URI로 식별되는 정적 문서
-- Prompt  incident_analysis_prompt : 여러 Tool을 조합하는 표준 진단 절차를 강제
+- Tool     list_menus / get_menu : data/menus.json 조회 (매 호출 파일을 읽어 데이터 교체가 바로 반영)
+- Tool     get_meal_history / save_meal : session.db meals 테이블 (호출마다 값이 달라지는 동적 조회)
+- Resource menu://allergens : 알레르기 표기 사전(URI로 식별되는 정적 문서). 값은 str 또는 list[str]
+
+모든 Tool 은 JSON 객체 1개를 반환한다 — mcp_client.call_tool 이 content[0].text 하나만 파싱한다.
 """
 import json
-import random
-from datetime import datetime
+import sys
 from pathlib import Path
 
-from fastmcp import FastMCP
-from pydantic import BaseModel, Field
+ROOT = Path(__file__).parent
+sys.path.insert(0, str(ROOT))   # subprocess 로 뜰 때도 agent 패키지를 import 하기 위해
 
-mcp = FastMCP(name="capstone-all-total-ops")
+from fastmcp import FastMCP  # noqa: E402
 
-DATA_DIR = Path(__file__).parent / "data"
+from agent import meal_db  # noqa: E402
+
+mcp = FastMCP(name="today-menu")
+
+DATA_DIR = ROOT / "data"
+_conn = None
 
 
-class SystemStatus(BaseModel):
-    system_name: str = Field(description="시스템 이름")
-    status: str = Field(description="상태: healthy / degraded / down")
-    cpu_percent: float = Field(description="CPU 사용률 (%)")
-    memory_percent: float = Field(description="메모리 사용률 (%)")
-    last_checked: str = Field(description="마지막 체크 시각 (ISO 8601)")
-    alerts: list[str] = Field(default_factory=list, description="활성 알림 목록")
+def _db():
+    global _conn
+    if _conn is None:
+        _conn = meal_db.connect(meal_db.DB_PATH)
+    return _conn
+
+
+def _menus() -> list[dict]:
+    return json.loads((DATA_DIR / "menus.json").read_text(encoding="utf-8"))
+
+
+def _find(name: str) -> dict | None:
+    return next((m for m in _menus() if m["name"] == name), None)
 
 
 @mcp.tool()
-def get_monitoring_status(system_name: str) -> SystemStatus:
-    """지정된 시스템의 현재 모니터링 상태를 조회합니다 (호출마다 값이 달라지는 동적 Tool)."""
-    monitoring_data = json.loads((DATA_DIR / "monitoring.json").read_text())
-    if system_name not in monitoring_data:
-        return SystemStatus(
-            system_name=system_name, status="unknown",
-            cpu_percent=0.0, memory_percent=0.0,
-            last_checked=datetime.now().isoformat(),
-            alerts=[f"System '{system_name}' not found in monitoring"],
-        )
-    data = monitoring_data[system_name]
-    jitter = random.uniform(-3.0, 8.0)
-    return SystemStatus(
-        system_name=system_name,
-        status=data["status"],
-        cpu_percent=round(data["cpu_base"] + jitter, 1),
-        memory_percent=round(data["memory_base"] + jitter / 2, 1),
-        last_checked=datetime.now().isoformat(timespec="microseconds"),
-        alerts=data.get("alerts", []),
-    )
+def list_menus(category: str | None = None) -> dict:
+    """전체 메뉴 목록을 반환합니다. category 를 주면 그 카테고리만."""
+    menus = [m for m in _menus() if category is None or m["category"] == category]
+    return {"menus": menus, "count": len(menus)}
 
 
-@mcp.resource("runbook://incident-response/{incident_type}")
-def get_incident_runbook(incident_type: str) -> str:
-    """특정 incident 유형의 runbook(정적 문서)을 반환합니다."""
-    runbook_path = DATA_DIR / "runbooks" / f"{incident_type}.md"
-    if not runbook_path.exists():
-        return f"# Runbook Not Found\n\nNo runbook for incident type: {incident_type}"
-    return runbook_path.read_text()
+@mcp.tool()
+def get_menu(name: str) -> dict:
+    """이름이 정확히 같은 메뉴 1개를 반환합니다. 없으면 menu 가 null."""
+    return {"menu": _find(name)}
 
 
-@mcp.prompt()
-def incident_analysis_prompt(system_name: str, symptom: str) -> str:
-    """장애 진단 표준 절차 프롬프트 — planning 노드가 계획을 세울 때 이 절차를 따른다."""
-    return f"""다음 장애에 대해 표준 진단 절차를 수행하세요.
+@mcp.tool()
+def get_meal_history(user_id: str, days: int = 3) -> dict:
+    """user_id 가 최근 days 일 동안 먹었다고 기록한 메뉴(최신순)."""
+    return {"user_id": user_id, "days": days, "items": meal_db.select_meals(_db(), user_id, days)}
 
-## 장애 정보
-- 시스템: {system_name}
-- 증상: {symptom}
 
-## 진단 절차 (반드시 순서대로 수행)
-1. get_monitoring_status Tool로 관련 시스템의 현재 상태를 조회하세요.
-2. 증상에 해당하는 runbook(runbook://incident-response/...)을 확인하세요.
-3. 위 정보를 종합해 가능한 원인과 권장 조치를 제시하세요.
-"""
+@mcp.tool()
+def save_meal(user_id: str, menu_name: str) -> dict:
+    """'먹었어요' 기록. 메뉴 데이터에 없는 이름이면 ok=false."""
+    if _find(menu_name) is None:
+        return {"ok": False, "error": {"code": "UNKNOWN_MENU",
+                                       "message": f"메뉴 목록에 없는 이름입니다: {menu_name}"}}
+    return {"ok": True, "item": meal_db.insert_meal(_db(), user_id, menu_name)}
+
+
+@mcp.resource("menu://allergens", mime_type="application/json")
+def allergen_alias() -> str:
+    """알레르기 표기 사전(사용자 표기 → 데이터 표기 1개 또는 리스트). 추출 직후 정규화에 쓴다."""
+    return (DATA_DIR / "allergen_alias.json").read_text(encoding="utf-8")
 
 
 if __name__ == "__main__":

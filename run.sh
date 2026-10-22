@@ -8,7 +8,8 @@ if [[ ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
-MODE="${LLM_BACKEND:-fake}"
+# 셸 환경변수 > .env > fake 순서
+MODE="${LLM_BACKEND:-$("$PYTHON" -c 'from dotenv import dotenv_values; print(dotenv_values(".env").get("LLM_BACKEND") or "fake")')}"
 case "$MODE" in
   fake|openai|ollama) ;;
   *) echo "지원하지 않는 LLM_BACKEND: $MODE (fake / openai / ollama)"; exit 1 ;;
@@ -46,7 +47,7 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-LLM_BACKEND="$MODE" SUPERVISOR_VERSION="${SUPERVISOR_VERSION:-v2}" "$PYTHON" server.py &
+LLM_BACKEND="$MODE" "$PYTHON" server.py &
 API_PID=$!
 for _ in {1..60}; do
   if ! kill -0 "$API_PID" 2>/dev/null; then break; fi
