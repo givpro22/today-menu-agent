@@ -43,7 +43,7 @@ from agent.session_store import SqliteSessionStore
 from agent.state import initial_state
 
 ROOT = Path(__file__).parent
-CONTRACT_VERSION = "1.1"
+CONTRACT_VERSION = "1.2"
 MAX_MESSAGE_CHARS = 500
 USER_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 CREATION_COUNT = 0   # Wave 1 — 프로세스 내 Agent 번들 생성 횟수 (항상 1이어야 정상)
@@ -180,7 +180,7 @@ async def lifespan(app: FastAPI):
             quality_llm=quality_llm,
             menu_repo=menu_repo,
             session_store=session_store,
-            review_mode=os.environ.get("REVIEW_MODE", "llm"),
+            review_mode=os.environ.get("REVIEW_MODE", "rules"),
         )
         app.state.deps = deps
         app.state.graph = build_graph(deps, checkpointer=checkpointer)
