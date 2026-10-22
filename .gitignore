@@ -1,0 +1,16 @@
+# from sample
+.env
+.venv/
+session.db
+__pycache__/
+*.log
+
+# project
+*.db
+_workspace*/
+.pytest_cache/
+.DS_Store
+
+# course materials (재배포 금지 문구 / 원본 zip)
+AI 서비스 Mini-Project.pdf
+all_total_vue_student*.zip
