@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>오늘뭐먹지 발표</title>
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  :root {
+    --ink: #1f2330;
+    --sub: #5b6072;
+    --line: #d9dce5;
+    --soft: #f3f4f8;
+    --accent: #4f46e5;
+    --accent-soft: #e8e7fc;
+    --warn: #b45309;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  body {
+    font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    color: var(--ink); word-break: keep-all;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  section {
+    width: 1280px; height: 720px; position: relative; overflow: hidden;
+    padding: 56px 72px 48px; page-break-after: always; break-after: page;
+    background: #fff;
+  }
+  section:last-child { page-break-after: auto; break-after: auto; }
+  h1 { font-size: 38px; margin: 0 0 14px; letter-spacing: -0.5px; }
+  .lead { font-size: 21px; color: var(--sub); margin: 0 0 30px; line-height: 1.5; }
+  .no { position: absolute; right: 48px; bottom: 28px; font-size: 14px; color: var(--sub); }
+  .src { position: absolute; left: 72px; bottom: 28px; font-size: 13px; color: var(--sub); }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 0.92em; }
+
+  /* 표지 */
+  .cover { display: flex; flex-direction: column; justify-content: center; padding-left: 96px; }
+  .cover .kicker { font-size: 18px; color: var(--accent); margin-bottom: 18px; }
+  .cover h1 { font-size: 64px; margin-bottom: 22px; }
+  .cover .lead { font-size: 25px; max-width: 900px; }
+  .cover .example { margin-top: 34px; font-size: 19px; color: var(--sub); border-left: 4px solid var(--accent); padding: 6px 0 6px 18px; max-width: 900px; line-height: 1.6; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 19px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 16px; color: var(--sub); font-weight: 600; background: var(--soft); }
+  td.tag { color: var(--accent); font-size: 15px; white-space: nowrap; }
+  .num td { text-align: center; }
+  .num td:first-child, .num th:first-child { text-align: left; }
+  .num th { text-align: center; }
+  .pending { color: #9aa0b2; }
+  .note { font-size: 15px; color: var(--sub); margin-top: 16px; line-height: 1.6; }
+
+  svg text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+
+  .shots { display: flex; gap: 22px; }
+  .shot { width: 362px; }
+  .shot .frame {
+    width: 362px; height: 360px; border: 1px solid var(--line); border-radius: 8px;
+    background: #22242f; overflow: hidden;
+  }
+  .shot .frame img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .shot p { font-size: 16px; line-height: 1.5; margin: 12px 2px 0; }
+  .shot p b { color: var(--accent); }
+
+  ul.plain { margin: 0; padding: 0; list-style: none; }
+  ul.plain li { font-size: 20px; line-height: 1.5; padding: 13px 0 13px 22px; border-bottom: 1px solid var(--line); position: relative; }
+  ul.plain li::before { content: ""; position: absolute; left: 2px; top: 25px; width: 8px; height: 8px; border-radius: 2px; background: var(--accent); }
+  ul.plain li small { display: block; color: var(--sub); font-size: 16px; margin-top: 3px; }
+  .item { font-size: 14px; color: var(--accent); letter-spacing: 0.2px; margin-bottom: 10px; }
+  .cover .item { margin-bottom: 6px; color: var(--sub); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; background: var(--soft); min-height: 168px; }
+  .card h3 { margin: 0 0 10px; font-size: 20px; }
+  .card p { margin: 0; font-size: 16px; line-height: 1.6; color: var(--sub); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 40px; }
+  ul.tight { margin: 0; padding: 0; list-style: none; }
+  ul.tight li { font-size: 16px; line-height: 1.5; padding: 8px 0 8px 18px; position: relative; border-bottom: 1px solid var(--line); }
+  ul.tight li::before { content: ""; position: absolute; left: 2px; top: 17px; width: 7px; height: 7px; border-radius: 2px; background: var(--accent); }
+  td.bad { color: var(--warn); }
+  .num td.note-cell { text-align: left; font-size: 15px; color: var(--sub); }
+</style>
+</head>
+<body>
+
+<!-- 1. 표지 -->
+<section class="cover">
+  <div class="item">1 · 주제와 개발 목적</div>
+  <div class="kicker">AI 서비스 개발 Mini-project · 과제 2 신규 서비스</div>
+  <h1>오늘뭐먹지</h1>
+  <p class="lead">노트북에서 만든 메뉴 추천 그래프를 sample 프로젝트 구조 위에서 실제로 쓸 수 있는 서비스로 옮겼다.</p>
+  <div class="example">"돈이 없어서 5000원 안쪽으로 먹어야 해. 근데 밀가루 알레르기 있어서 면이랑 빵은 못 먹어"<br>→ 조건에 맞는 메뉴 최대 3개와 이유</div>
+  <div class="no">1</div>
+</section>
+
+<!-- 2. 문제 -->
+<section>
+  <div class="item">1 · 주제와 개발 목적</div>
+  <h1>노트북에서 남은 문제와 개발 목적</h1>
+  <p class="lead">노트북 10절에 적어 둔 한계 다섯 가지와 이번에 새로 찾은 두 가지를 고치는 게 목표였다.</p>
+  <table>
+    <tr><th style="width:52%">노트북(Before)</th><th>이번에 바꾼 것(After)</th><th style="width:10%"></th></tr>
+    <tr><td>예산·시간 조건을 묻지 않고 풀었다</td><td>풀기 전에 <code>interrupt()</code> 로 승인을 받는다</td><td class="tag">10절</td></tr>
+    <tr><td>이유 문장을 검사하지 않았다 (맵기 2 제육볶음을 "매운맛 강함")</td><td>review 노드가 이유와 메뉴 데이터를 대조한다</td><td class="tag">10절</td></tr>
+    <tr><td>MemorySaver 라 재시작하면 최근 추천을 잊었다</td><td>최근 추천·식사 기록을 SQLite 에 둔다</td><td class="tag">10절</td></tr>
+    <tr><td>메뉴 36개가 코드에 박혀 있었다</td><td><code>data/</code> + MCP Tool 로 조회한다</td><td class="tag">10절</td></tr>
+    <tr><td>완화 내역을 추천 입력에서 뺐다 (된장찌개 8500원 누락)</td><td>추천 입력에 완화 칸을 되살렸다</td><td class="tag">10절</td></tr>
+    <tr><td>후보 목록 밖 메뉴도 조건만 맞으면 통과했다</td><td>verify 가 후보 밖 pick 을 빼고 재추천한다</td><td class="tag">새로 찾음</td></tr>
+    <tr><td>"해산물" 이 새우 하나로만 바뀌었다</td><td>새우·오징어·조개·생선으로 펼친다</td><td class="tag">새로 찾음</td></tr>
+  </table>
+  <div class="no">2</div>
+</section>
+
+<!-- 3. 주요 기능 -->
+<section>
+  <div class="item">2 · 주요 기능과 시스템 구성</div>
+  <h1>주요 기능</h1>
+  <p class="lead">식사 상황을 한 문장으로 적으면 조건에 맞는 메뉴를 최대 3개, 이유와 함께 보여 준다.</p>
+  <div class="grid">
+    <div class="card"><h3>문장 → 조건</h3><p>LLM 이 예산·시간·알레르기·끼니를 뽑고, 표기는 코드가 데이터에 맞춘다. 밀가루는 밀로, 해산물은 새우·오징어·조개·생선으로 바꾼다.</p></div>
+    <div class="card"><h3>코드 판정</h3><p>알레르기·맵기·끼니·최근 추천·먹은 메뉴는 <code>rules.py</code> 가 거른다. LLM 이 무엇을 골라도 verify 를 거쳐야 결과에 들어간다.</p></div>
+    <div class="card"><h3>완화 전에 승인</h3><p>후보가 없으면 "예산을 8,500원으로 올려서 찾아볼까요?" 처럼 먼저 묻고 기다린다. 알레르기·맵기·끼니는 풀지 않는다.</p></div>
+    <div class="card"><h3>이유 검증</h3><p>review 노드가 이유 속 맵기·국물 표현을 메뉴 데이터와 대조하고, 틀리면 데이터로 만든 문장으로 바꾼다. 기본은 규칙 판정이다.</p></div>
+    <div class="card"><h3>재시작해도 기억</h3><p>최근 추천 6개와 식사 기록은 <code>session.db</code>, 승인 대기 상태는 <code>checkpoints.db</code> 에 둔다. 서버를 다시 켜도 이어진다.</p></div>
+    <div class="card"><h3>먹었어요 · 식사 기록</h3><p>추천 카드의 버튼으로 먹은 메뉴를 남긴다. 최근 3일 안에 먹은 메뉴는 다음 추천에서 뺀다.</p></div>
+  </div>
+  <div class="no">3</div>
+</section>
+
+<!-- 4. 시스템 구성 -->
+<section>
+  <div class="item">2 · 주요 기능과 시스템 구성</div>
+  <h1>시스템 구성</h1>
+  <p class="lead">화면은 Vue, API 는 FastAPI, 판단은 LangGraph 가 맡는다. 데이터는 MCP 서버와 SQLite 에 있다.</p>
+  <svg width="1136" height="430" viewBox="0 0 1136 430">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5b6072"/>
+      </marker>
+    </defs>
+    <g font-size="16" fill="#1f2330">
+      <!-- 브라우저 -->
+      <rect x="0" y="150" width="180" height="96" rx="10" fill="#f3f4f8" stroke="#d9dce5"/>
+      <text x="90" y="185" text-anchor="middle" font-weight="700">브라우저</text>
+      <text x="90" y="210" text-anchor="middle" font-size="14" fill="#5b6072">Vue 3</text>
+      <text x="90" y="230" text-anchor="middle" font-size="14" fill="#5b6072">web_chat.html</text>
+      <!-- 프록시 -->
+      <rect x="226" y="150" width="190" height="96" rx="10" fill="#f3f4f8" stroke="#d9dce5"/>
+      <text x="321" y="185" text-anchor="middle" font-weight="700">web_demo_server</text>
+      <text x="321" y="210" text-anchor="middle" font-size="14" fill="#5b6072">:8600</text>
+      <text x="321" y="230" text-anchor="middle" font-size="14" fill="#5b6072">화면 파일 · 프록시</text>
+      <!-- API -->
+      <rect x="462" y="150" width="200" height="96" rx="10" fill="#f3f4f8" stroke="#d9dce5"/>
+      <text x="562" y="185" text-anchor="middle" font-weight="700">server.py (FastAPI)</text>
+      <text x="562" y="210" text-anchor="middle" font-size="14" fill="#5b6072">:8100</text>
+      <text x="562" y="230" text-anchor="middle" font-size="14" fill="#5b6072">/chat · /chat/resume · /meals</text>
+      <!-- LangGraph -->
+      <rect x="708" y="150" width="200" height="96" rx="10" fill="#e8e7fc" stroke="#4f46e5"/>
+      <text x="808" y="185" text-anchor="middle" font-weight="700">LangGraph</text>
+      <text x="808" y="210" text-anchor="middle" font-size="14" fill="#5b6072">agent/graph.py</text>
+      <text x="808" y="230" text-anchor="middle" font-size="14" fill="#5b6072">노드 12개 · rules.py</text>
+      <!-- MCP -->
+      <rect x="954" y="20" width="182" height="110" rx="10" fill="#f3f4f8" stroke="#d9dce5"/>
+      <text x="1045" y="52" text-anchor="middle" font-weight="700">MCP 서버 (stdio)</text>
+      <text x="1045" y="76" text-anchor="middle" font-size="14" fill="#5b6072">mcp_server.py</text>
+      <text x="1045" y="96" text-anchor="middle" font-size="14" fill="#5b6072">Tool 4 · Resource 1</text>
+      <text x="1045" y="116" text-anchor="middle" font-size="14" fill="#5b6072">menus.json · 알레르기 사전</text>
+      <!-- OpenAI -->
+      <rect x="954" y="268" width="182" height="80" rx="10" fill="#f3f4f8" stroke="#d9dce5"/>
+      <text x="1045" y="300" text-anchor="middle" font-weight="700">OpenAI</text>
+      <text x="1045" y="324" text-anchor="middle" font-size="14" fill="#5b6072">gpt-4o-mini · temperature 0</text>
+      <!-- SQLite -->
+      <rect x="462" y="318" width="200" height="96" rx="10" fill="#fff" stroke="#1f2330" stroke-dasharray="5 4"/>
+      <text x="562" y="350" text-anchor="middle" font-weight="700">session.db</text>
+      <text x="562" y="374" text-anchor="middle" font-size="14" fill="#5b6072">대화 · 최근 추천 · 식사 기록</text>
+      <text x="562" y="394" text-anchor="middle" font-size="14" fill="#5b6072">재시작해도 남는다</text>
+      <rect x="708" y="318" width="200" height="96" rx="10" fill="#fff" stroke="#1f2330" stroke-dasharray="5 4"/>
+      <text x="808" y="350" text-anchor="middle" font-weight="700">checkpoints.db</text>
+      <text x="808" y="374" text-anchor="middle" font-size="14" fill="#5b6072">승인 대기 중인 그래프 상태</text>
+      <text x="808" y="394" text-anchor="middle" font-size="14" fill="#5b6072">AsyncSqliteSaver</text>
+    </g>
+    <g stroke="#5b6072" stroke-width="2" fill="none" marker-end="url(#ah)">
+      <path d="M180,198 L224,198"/>
+      <path d="M416,198 L460,198"/>
+      <path d="M662,198 L706,198"/>
+      <path d="M908,178 L952,108"/>
+      <path d="M908,218 L952,290"/>
+      <path d="M562,246 L562,316"/>
+      <path d="M808,246 L808,316"/>
+    </g>
+    <g font-size="13" fill="#5b6072">
+      <text x="202" y="186" text-anchor="middle">SSE</text>
+      <text x="438" y="186" text-anchor="middle">HTTP</text>
+      <text x="937" y="132" text-anchor="end">메뉴 조회</text>
+      <text x="944" y="246">추출·추천</text>
+      <text x="572" y="288">기록</text>
+      <text x="818" y="288">interrupt</text>
+    </g>
+    <g font-size="14" fill="#1f2330">
+      <text x="0" y="40" font-weight="700">sample 에서 그대로 둔 것</text>
+      <text x="0" y="64" fill="#5b6072">FastAPI·SSE·MCP stdio 구조, 의존성 주입, SQLite 대화 기록</text>
+      <text x="0" y="96" font-weight="700">바꾼 것</text>
+      <text x="0" y="120" fill="#5b6072">장애 진단 노드·데이터를 메뉴 추천으로 교체</text>
+    </g>
+  </svg>
+  <div class="no">4</div>
+</section>
+
+<!-- 5. 기술적 특징 -->
+<section>
+  <div class="item">3 · 기술적 특징</div>
+  <h1>기술적 특징</h1>
+  <p class="lead" style="margin-bottom:6px">판정은 코드가 하고, LLM 은 조건을 뽑고 후보 안에서 고르고 이유를 쓴다.</p>
+  <svg width="1136" height="290" viewBox="0 60 1136 365" preserveAspectRatio="xMinYMin meet">
+    <defs>
+      <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5b6072"/>
+      </marker>
+    </defs>
+    <!-- 노드: 가로 112, 세로 46 -->
+    <g font-size="15" text-anchor="middle">
+      <rect x="10" y="150" width="112" height="46" rx="8" fill="#f3f4f8" stroke="#d9dce5"/><text x="66" y="179">route</text>
+      <rect x="144" y="150" width="112" height="46" rx="8" fill="#f3f4f8" stroke="#d9dce5"/><text x="200" y="179">extract</text>
+      <rect x="278" y="150" width="112" height="46" rx="8" fill="#f3f4f8" stroke="#d9dce5"/><text x="334" y="179">filter</text>
+      <rect x="426" y="150" width="112" height="46" rx="8" fill="#f3f4f8" stroke="#d9dce5"/><text x="482" y="179">recommend</text>
+      <rect x="574" y="150" width="112" height="46" rx="8" fill="#f3f4f8" stroke="#d9dce5"/><text x="630" y="179">verify</text>
+      <rect x="722" y="150" width="112" height="46" rx="8" fill="#e8e7fc" stroke="#4f46e5"/><text x="778" y="179">review</text>
+      <rect x="866" y="150" width="112" height="46" rx="8" fill="#e8e7fc" stroke="#4f46e5"/><text x="922" y="179">remember</text>
+      <rect x="1010" y="150" width="112" height="46" rx="8" fill="#f3f4f8" stroke="#d9dce5"/><text x="1066" y="179">finalize</text>
+
+      <rect x="10" y="300" width="112" height="46" rx="8" fill="#f3f4f8" stroke="#d9dce5"/><text x="66" y="329">chat_answer</text>
+      <rect x="144" y="300" width="112" height="46" rx="8" fill="#f3f4f8" stroke="#d9dce5"/><text x="200" y="329">relax</text>
+      <rect x="270" y="300" width="128" height="46" rx="8" fill="#e8e7fc" stroke="#4f46e5"/><text x="334" y="329">approve_relax</text>
+      <rect x="722" y="300" width="112" height="46" rx="8" fill="#f3f4f8" stroke="#d9dce5"/><text x="778" y="329">no_result</text>
+    </g>
+    <g stroke="#5b6072" stroke-width="2" fill="none" marker-end="url(#ah2)">
+      <path d="M122,173 L142,173"/>
+      <path d="M256,173 L276,173"/>
+      <path d="M390,173 L424,173"/>
+      <path d="M538,173 L572,173"/>
+      <path d="M686,173 L720,173"/>
+      <path d="M834,173 L864,173"/>
+      <path d="M978,173 L1008,173"/>
+      <!-- route → chat_answer -->
+      <path d="M66,196 L66,298"/>
+      <!-- filter → approve_relax -->
+      <path d="M334,196 L334,298"/>
+      <!-- approve_relax → relax -->
+      <path d="M270,323 L258,323"/>
+      <!-- relax → filter -->
+      <path d="M200,300 L300,198"/>
+      <!-- approve_relax → no_result -->
+      <path d="M398,323 L720,323"/>
+      <!-- verify → no_result -->
+      <path d="M650,196 L740,298"/>
+      <!-- no_result → finalize -->
+      <path d="M834,323 L1050,198"/>
+      <!-- verify → recommend 재추천 -->
+      <path d="M630,150 C630,88 482,88 482,148"/>
+    </g>
+    <g font-size="14" fill="#5b6072">
+      <text x="556" y="80" text-anchor="middle">후보 밖·조건 위반이 빠지면 재추천 (1회)</text>
+      <text x="344" y="252">후보 0</text>
+      <text x="226" y="380" text-anchor="middle">승인 → 최대 2회</text>
+      <text x="560" y="314" text-anchor="middle">거절 · 풀 조건 없음</text>
+      <text x="668" y="252" text-anchor="end">통과 0개</text>
+      <text x="76" y="252">인사·잡담</text>
+    </g>
+    <g font-size="15" fill="#1f2330">
+      <rect x="10" y="398" width="18" height="18" rx="4" fill="#e8e7fc" stroke="#4f46e5"/>
+      <text x="38" y="412">새로 넣거나 바꾼 노드: approve_relax(승인 대기, 새로), review(이유 검증, 새로), remember(State → SQLite)</text>
+    </g>
+  </svg>
+  <div class="cols" style="margin-top:4px">
+    <ul class="tight">
+      <li><code>rules.py</code> 의 판정 함수를 filter 와 verify 가 같이 쓴다. 사본을 두지 않았고, 같은 함수인지 테스트로 확인한다</li>
+      <li><code>build_graph(deps)</code> 로 LLM 과 menu_repo 를 주입한다. fake·openai·ollama, MCP·로컬을 env 로 바꾼다</li>
+      <li>MCP Tool 4개와 Resource 1개(알레르기 사전). MCP 가 응답하지 않으면 로컬 JSON 으로 폴백한다</li>
+    </ul>
+    <ul class="tight">
+      <li><code>interrupt()</code> 로 멈추고 <code>Command(resume=...)</code> 로 잇는다. 대기 상태는 AsyncSqliteSaver 가 파일에 남긴다</li>
+      <li>루프 상한을 State 카운터로 둔다. 완화 2회, 재추천 1회</li>
+      <li>계약 문서(v1.2)를 먼저 쓰고 그래프·백엔드·화면을 나눠 구현했다</li>
+    </ul>
+  </div>
+  <div class="no">5</div>
+</section>
+
+<!-- 6. 실행 화면 -->
+<section>
+  <div class="item">4 · 실행과 테스트 결과</div>
+  <h1>실행 화면</h1>
+  <p class="lead">5000원·밀 알레르기 문장이면 예산을 얼마로 올릴지 먼저 묻고, 승인하면 그 조건으로 다시 찾는다.</p>
+  <div class="shots">
+    <div class="shot">
+      <div class="frame"><img src="img/s03_chat.png" alt=""></div>
+      <p><b>1. 승인 요청</b> 후보가 0개라 5,000원 → 8,500원을 제안한다. 알레르기·맵기·끼니는 바꾸지 않는다.</p>
+    </div>
+    <div class="shot">
+      <div class="frame"><img src="img/s11_chat.png" alt=""></div>
+      <p><b>2. 승인 후 결과</b> OpenAI 로 돌린 실제 응답. 완화 내역은 코드가 첫 줄에 쓴다.</p>
+    </div>
+    <div class="shot">
+      <div class="frame"><img src="img/s07_chat.png" alt=""></div>
+      <p><b>3. 재방문</b> 직전 추천 3개와 먹었어요를 누른 메뉴를 빼고 추천한다. 서버를 다시 켜도 같다.</p>
+    </div>
+  </div>
+  <div class="no">6</div>
+</section>
+
+<!-- 7. 테스트 -->
+<section>
+  <div class="item">4 · 실행과 테스트 결과</div>
+  <h1>테스트 결과</h1>
+  <p class="lead">개발과 테스트는 fake LLM 으로 돌리고, 실제 OpenAI 는 스모크와 실측에만 썼다.</p>
+  <table>
+    <tr><th style="width:34%">무엇을</th><th style="width:22%">결과</th><th>내용</th></tr>
+    <tr><td>pytest (fake LLM, 네트워크 없음)</td><td>140 passed, 0 failed</td><td>규칙·그래프 경로·API·MCP·화면 경계·데이터 무결성. 27초</td></tr>
+    <tr><td>회귀 문장 라이브 실행 (fake, 8600 경유)</td><td>22 / 22 통과</td><td>노트북 case1~3, 해산물 알레르기, 예외 입력, 재시작 전후</td></tr>
+    <tr><td>승인 대기 중 서버 재시작</td><td>대기 유지</td><td>다시 켠 뒤 <code>/chat/pending</code> true → 승인 → 추천 완료</td></tr>
+    <tr><td>같은 승인을 두 번 보냄</td><td>두 번째는 409</td><td>대기가 없으면 <code>NO_PENDING_APPROVAL</code> 로 막는다</td></tr>
+    <tr><td>OpenAI 스모크 (gpt-4o-mini)</td><td>4 / 4 통과</td><td>case1·case2·case3·승인. 호출 12회, 폴백 0, 안전 검사 전부 통과</td></tr>
+  </table>
+  <p class="note">안전 검사의 알레르기 정답은 시스템 사전이 아니라 사람이 손으로 적은 표에서 가져온다. 같은 사전을 쓰면 시스템과 함께 틀려서 누출을 못 잡는다(해산물 누출을 이렇게 놓쳤었다).</p>
+  <div class="src">출처: _workspace/05_qa_report.md 회차 3·4·5-R, 05_qa_live_runs.md</div>
+  <div class="no">7</div>
+</section>
+
+<!-- 8. Before / After -->
+<section>
+  <div class="item">5 · 개선 성과와 한계</div>
+  <h1>Before / After</h1>
+  <p class="lead">같은 21문장을 같은 모델(gpt-4o-mini, temperature 0)로 두 번씩 돌려 채점했다.</p>
+  <table class="num">
+    <tr><th style="width:36%">지표</th><th style="width:15%">Before (노트북)</th><th style="width:15%">After</th><th style="text-align:left">메모</th></tr>
+    <tr><td>알레르기 위반 메뉴 (단일 요청)</td><td>3</td><td>0</td><td class="note-cell">북엇국 2(데이터 누락), 우동 1(해산물→새우 사전)</td></tr>
+    <tr><td>해산물 문장에서 알레르기 정규화 누락</td><td>4 / 4</td><td>0 / 4</td><td class="note-cell">Before 는 "해산물" 을 새우로만 바꿨다</td></tr>
+    <tr><td>재시작 후 직전 추천과 겹친 비율</td><td>0.963 / 0.926</td><td>0</td><td class="note-cell">재방문 10문장. Before 는 MemorySaver 가 비었다</td></tr>
+    <tr><td>승인 없이 예산·시간을 푼 실행</td><td>3</td><td>0</td><td class="note-cell">After 는 3번 모두 먼저 묻고 풀었다</td></tr>
+    <tr><td>응답 시간 중앙값 (ms)</td><td>4,891 / 4,526</td><td class="bad">5,398 / 5,104</td><td class="note-cell">나빠짐. 약 10~13% 늘었다</td></tr>
+    <tr><td>요청당 LLM 호출 수</td><td>1.95</td><td class="bad">2.95</td><td class="note-cell">나빠짐. route 분류 호출이 1번 더 있다</td></tr>
+  </table>
+  <p class="note">"a / b" 는 1회차 / 2회차 값이고, 하나만 적은 칸은 두 번 다 같았다. After 는 MCP·SQLite·REVIEW_MODE=rules 로 돌렸고, 승인 요청은 자동으로 승인했다. Before 는 노트북 코드 그대로이고 LLM 전송만 After 와 같은 JSON 모드로 맞췄다.<br>
+  LLM 판정 reviewer(1차 측정 재사용, 북엇국 데이터 보정 전)는 응답 시간 중앙값 7,470 / 7,292ms, 호출 3.9회였다. 지연·호출 수 비교에만 쓴다.</p>
+  <div class="src">출처: eval/results/2026-10-22_openai_final_summary.md</div>
+  <div class="no">8</div>
+</section>
+
+<!-- 9. 한계 -->
+<section>
+  <div class="item">5 · 개선 성과와 한계</div>
+  <h1>한계와 다음</h1>
+  <p class="lead">안전 조건은 지켰지만, 이유 문장의 질과 응답 속도는 아직 손볼 곳이 남아 있다.</p>
+  <ul class="plain">
+    <li>LLM 판정 reviewer 가 맞는 이유도 모순이라고 자주 판정했다
+      <small>1차 실측에서 판정 30건을 직접 읽어 보니 약 25건이 오탐이었다. 기본값을 규칙 판정으로 바꾸고 LLM 판정은 옵션으로 남겼다. 규칙 판정은 표현을 놓칠 수 있다.</small></li>
+    <li>이유 문장이 사용자 상황과 약하게 이어진다
+      <small>돈 없음·밀 알레르기 문장에도 "혼자서 간편하게" 같은 말이 반복된다. review 는 데이터 모순만 보기 때문에 이건 못 잡는다.</small></li>
+    <li>"어제 치킨" 에서 닭고기 회피가 추출되지 않았다
+      <small>노트북 추출 규칙 2 가 실모델에서는 지켜지지 않았다. 이번 결과에는 영향이 없었다.</small></li>
+    <li>LLM 을 동기 httpx 로 호출해서, 응답을 기다리는 동안 서버 전체가 멈춘다
+      <small>노드에서 <code>asyncio.to_thread</code> 로 감싸면 인터페이스는 그대로 두고 풀 수 있다.</small></li>
+    <li>데이터가 틀리면 코드 판정도 같이 틀린다
+      <small>북엇국(북어)에 생선 표기가 빠져 있던 것을 실측 중에 찾아 고쳤고, 재료 → 알레르기 대응표로 데이터를 검사하는 테스트를 넣었다.</small></li>
+  </ul>
+  <div class="no">9</div>
+</section>
+
+</body>
+</html>
