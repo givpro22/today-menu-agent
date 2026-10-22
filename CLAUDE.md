@@ -13,3 +13,4 @@
 | 2026-10-22 | 모든 에이전트에 git 스테이징·커밋 금지 원칙 추가 | agents/* | platform-engineer 의 git rm 이 하네스 커밋에 섞임 |
 | 2026-10-22 | 알레르기 상위 개념 펼치기 규칙, 정답 라벨 독립 원칙 | skills/menu-domain-spec, menu-before-after-eval | QA 회차 2 해산물 알레르기 누출 |
 | 2026-10-22 | 발표 필수 5항목(주제·목적 / 기능·구성 / 기술 특징 / 실행·테스트 / 성과·한계) | skills/menu-before-after-eval | 사용자 요청: 과제 공지 발표 포함 항목 |
+| 2026-10-22 | 발표 2장을 "왜 만들었나"(문제 상황·사용자·목적)로, 노트북 한계 표는 3장으로 | skills/menu-before-after-eval | 사용자 요청: 노트북 한계 말고 개발 이유 |
