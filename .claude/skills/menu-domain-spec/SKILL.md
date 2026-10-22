@@ -63,6 +63,7 @@ relax 2회, 재추천(verify→recommend) 1회. 그래프에 루프를 추가하
 | MemorySaver 휘발 | SQLite 영속 |
 | 메뉴 하드코딩 | data/ + MCP Tool |
 | 완화 정보 입력 제거 | 입력으로 복원 |
+| verify 가 후보 목록 밖 메뉴를 통과시킴(조건만 맞으면) — 프롬프트 규칙 1 미강제 | verify 에서 후보 밖 pick 차단 → 재추천 |
 
 ## 참고
 - 노트북 원본 코드 전체(Before 구현): `references/notebook_baseline.md` — 이식하거나 Before 를 재현할 때 읽는다.

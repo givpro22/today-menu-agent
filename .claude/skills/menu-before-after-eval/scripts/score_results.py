@@ -6,6 +6,7 @@
      "relaxed": ["예산 5000원 → 8500원"],
      "kept": [{"name": "볶음밥", "reason": "..."}],
      "prev_recommended": ["된장찌개", ...],      # 이 실행 직전에 같은 사용자에게 추천된 메뉴 (재시작 포함)
+     "candidates": ["된장찌개", ...],            # (선택) 이번 실행에서 LLM 에 준 후보 이름. 있으면 후보 밖 pick 을 센다
      "latency_ms": 1234, "llm_calls": 2}
 
 budget/max_minutes 는 사용자가 원래 말한 값이다. relaxed 가 있으면 초과는 '승인된 완화' 로 따로 센다.
@@ -60,6 +61,7 @@ def score(rows, menus):
         a["latency_ms"].append(r.get("latency_ms", 0))
         a["llm_calls"].append(r.get("llm_calls", 0))
         prev = set(r.get("prev_recommended", []))
+        cands = set(r["candidates"]) if r.get("candidates") else None
         for k in kept:
             m = by_name.get(k["name"])
             a["picks"].append(1)
@@ -75,6 +77,8 @@ def score(rows, menus):
                 a[key].append(f'{r["case_id"]}:{k["name"]}')
             if r.get("meal") in ("점심", "저녁") and "간식" in m["tags"]:
                 a["meal_violation"].append(f'{r["case_id"]}:{k["name"]}')
+            if cands is not None and k["name"] not in cands:
+                a["off_candidate"].append(f'{r["case_id"]}:{k["name"]}')
             if k["name"] in prev:
                 a["repeat"].append(f'{r["case_id"]}:{k["name"]}')
             for e in reason_errors(k.get("reason", ""), m):
@@ -95,11 +99,12 @@ def summarize(acc):
             "approved_over_limit": len(a["over_limit_approved"]),
             "meal_violations": len(a["meal_violation"]),
             "unknown_menu": len(a["unknown_menu"]),
+            "off_candidate": len(a["off_candidate"]),
             "repeat_rate": round(len(a["repeat"]) / picks, 3),
             "reason_error_rate": round(len(a["reason_error"]) / picks, 3),
             "latency_ms_median": statistics.median(a["latency_ms"]) if a["latency_ms"] else 0,
             "llm_calls_mean": round(statistics.mean(a["llm_calls"]), 2) if a["llm_calls"] else 0,
-            "details": {k: a[k] for k in ("allergy_violation", "over_limit_silent", "repeat", "reason_error") if a[k]},
+            "details": {k: a[k] for k in ("allergy_violation", "over_limit_silent", "off_candidate", "repeat", "reason_error") if a[k]},
         }
     return out
 
