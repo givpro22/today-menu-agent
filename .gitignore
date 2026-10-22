@@ -20,3 +20,8 @@ all_total_vue_student*.zip
 
 # fake 실행 결과는 실측이 아님
 eval/results/*fake*
+
+# 강의 원본 README, 이름이 든 이전 과제 파일 (로컬에만 둠)
+doc/course_guide.md
+AI_Agent_설계_및_구축_*.ipynb
+AI_Agent_설계_및_구축_*.pdf
