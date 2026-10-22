@@ -325,7 +325,7 @@ const MockApi = (() => {
   };
   const kept = (name, reason, review_fixed = false) => ({ ...MENUS[name], reason, review_fixed });
   const meta = (o) => ({
-    contract_version: '1.0', route: 'menu', llm_backend: 'fake', fast_llm: 'fast-model-stub',
+    contract_version: '1.1', route: 'menu', llm_backend: 'fake', fast_llm: 'fast-model-stub',
     quality_llm: 'quality-model-stub', review_mode: 'llm', llm_calls: 4, cost_usd: 0.000412, attempts: 1,
     relax_count: 0, elapsed_ms: 38, fallback: [], mcp_retries: 0, cancelled_pending: false,
     checkpointer: 'sqlite', instance_id: 4372119504, langsmith_run_id: null, ...o,
@@ -502,7 +502,7 @@ const MockApi = (() => {
     const method = (opts.method || 'GET').toUpperCase();
     let res;
     if (url.pathname === '/health') {
-      res = { status: 200, body: { status: 'ok', instance_id: 4372119504, creation_count: 1, llm_backend: 'fake', fast_llm: 'fast-model-stub', quality_llm: 'quality-model-stub', review_mode: 'llm', checkpointer: 'sqlite', menu_repo: 'mcp', menu_count: 36, contract_version: '1.0' } };
+      res = { status: 200, body: { status: 'ok', instance_id: 4372119504, creation_count: 1, llm_backend: 'fake', fast_llm: 'fast-model-stub', quality_llm: 'quality-model-stub', review_mode: 'llm', checkpointer: 'sqlite', menu_repo: 'mcp', menu_count: 36, contract_version: '1.1' } };
     } else if (url.pathname === '/chat/resume' && method === 'POST') {
       res = resume(body);
     } else if (url.pathname === '/chat/pending') {
@@ -615,7 +615,7 @@ const SPICY = ['안 매움', '약간 매움', '매움', '아주 매움'];
 const NO_RESULT_LABELS = {
   relax_rejected: '조건 완화를 거절함',
   relax_exhausted: '완화 횟수를 다 씀',
-  nothing_to_relax: '풀 수 있는 조건이 없음',
+  nothing_to_relax: '풀 수 있는 예산·시간 조건이 없음',
   verify_failed: '검증을 통과한 메뉴가 없음',
 };
 
@@ -627,7 +627,10 @@ const STEP_LABELS = {
       (e.excluded_recent ? ` · 최근 추천 ${e.excluded_recent}개 제외` : '') +
       (e.excluded_eaten ? ` · 최근 먹은 메뉴 ${e.excluded_eaten}개 제외` : ''),
   NeedsApproval: e => `조건 완화 승인 대기: ${e.proposal.label} ${withUnit(e.proposal.from, e.proposal.unit)} → ${withUnit(e.proposal.to, e.proposal.unit)}`,
-  RelaxDecision: e => (e.approved ? '조건 완화 승인됨' : '조건 완화 거절됨'),
+  // approved=null 은 nothing_to_relax: 제안할 조건이 없어 사용자에게 묻지 않은 경우
+  RelaxDecision: e => (e.approved === true ? '조건 완화 승인됨'
+      : e.approved === false ? '조건 완화 거절됨'
+      : '풀 수 있는 예산·시간 조건이 없어 완화하지 않았어요'),
   RelaxApplied: e => `조건 완화 적용: ${e.field === 'budget' ? '예산' : '시간'} ${withUnit(e.from, e.field === 'budget' ? '원' : '분')} → ${withUnit(e.to, e.field === 'budget' ? '원' : '분')}`,
   Recommended: e => `추천 ${e.attempt}회차: ${e.picks.join(', ')}`,
   Verified: e => (e.dropped.length
@@ -783,6 +786,7 @@ createApp({
       const es = openStream(url);
       let streamItem = null;
       let finished = false;
+      let gotError = false;   // Error 이벤트를 이미 보여 줬으면 onerror 에서 말풍선을 또 띄우지 않는다
 
       const finish = () => { es.close(); sending.value = false; stepsItem.loading = false; };
 
@@ -804,6 +808,7 @@ createApp({
           return;
         }
         if (e.type === 'Error') {
+          gotError = true;
           stepsItem.loading = false;
           pushError(errorInfo({ detail: e.detail }, e.status_code));
           return;
@@ -815,7 +820,7 @@ createApp({
       };
 
       es.onerror = () => {
-        if (!finished) pushError({ text: '서버와 연결이 끊겼어요. 백엔드가 켜져 있는지 확인해 주세요.', code: '', status: '' });
+        if (!finished && !gotError) pushError({ text: '서버와 연결이 끊겼어요. 백엔드가 켜져 있는지 확인해 주세요.', code: '', status: '' });
         finished = true;
         finish();
       };
