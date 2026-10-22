@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<title>운영 에이전트 채팅 (Vue)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>오늘뭐먹지 (Vue)</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -19,10 +20,18 @@
     display: flex; flex-direction: column;
   }
   header {
-    padding: 14px 20px; background: #262638; border-bottom: 1px solid #3a3a52;
-    font-weight: 600; font-size: 15px;
+    padding: 12px 20px; background: #262638; border-bottom: 1px solid #3a3a52;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   }
-  header span { color: #8b8bd8; font-weight: 400; font-size: 13px; margin-left: 8px; }
+  header .title { font-weight: 700; font-size: 16px; }
+  header .desc { color: #b5b5d0; font-size: 13px; }
+  header .label { color: #8b8bd8; font-size: 12px; margin-left: auto; }
+  header .mock-tag {
+    background: #6b4a12; color: #ffd27a; font-size: 11px; padding: 2px 8px; border-radius: 8px;
+  }
+  header .meal-toggle { padding: 6px 12px; font-size: 12px; background: #3a3a52; }
+  .layout { flex: 1; min-height: 0; display: flex; position: relative; }
+  .main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
   #log {
     flex: 1; min-height: 0;   /* flex 자식 기본 최소높이(콘텐츠 크기)를 풀어줘야
                                  내용이 길어져도 바디가 안 늘어나고 여기서만 스크롤됨 */
@@ -36,16 +45,20 @@
   .row.user { justify-content: flex-end; }
   .bubble {
     max-width: 70%; padding: 10px 14px; border-radius: 14px; line-height: 1.5;
-    font-size: 14px; white-space: pre-wrap;
+    font-size: 14px; white-space: pre-wrap; word-break: break-word;
   }
   .row.user .bubble { background: #5b5bd6; color: white; border-bottom-right-radius: 4px; }
   .row.agent .bubble { background: #2e2e42; border-bottom-left-radius: 4px; }
+  .row.error .bubble { background: #4a2330; border: 1px solid #8a3a4e; color: #ffd6de; border-bottom-left-radius: 4px; }
+  .row.error .bubble .code { display: block; font-size: 11px; color: #f2a0b2; margin-top: 4px; }
   .steps {
     max-width: 70%; font-size: 12px; color: #9a9ac0; padding: 6px 14px;
     display: flex; flex-direction: column; gap: 3px;
   }
-  .steps .step::before { content: "⏳ "; }
-  .steps .step.done::before { content: "✓ "; color: #7ee787; }
+  .steps .step::before { content: "✓ "; color: #7ee787; }
+  .steps .loading { color: #8b8bd8; }
+  .steps .loading::after { content: "..."; animation: dots 1.2s steps(3, end) infinite; display: inline-block; width: 1.2em; overflow: hidden; vertical-align: bottom; }
+  @keyframes dots { from { width: 0; } to { width: 1.2em; } }
   .prompt-box {
     flex-shrink: 0;   /* #log가 스크롤 영역이 되면서(min-height:0) <details>가 flex
                          자식으로서 내용 없이 찌그러지는 걸 방지 */
@@ -57,16 +70,69 @@
     list-style: none;
   }
   .prompt-box summary::-webkit-details-marker { display: none; }
-  .prompt-box summary::before { content: "🔍 "; }
-  .prompt-box[open] summary::before { content: "🔽 "; }
+  .prompt-box summary::before { content: "▸ "; }
+  .prompt-box[open] summary::before { content: "▾ "; }
   .prompt-box pre {
     margin: 0; padding: 10px 12px; border-top: 1px solid #3a3a52;
     background: #11111a; color: #c3c3e0; white-space: pre-wrap; word-break: break-word;
     font-family: ui-monospace, "SF Mono", Menlo, monospace; max-height: 320px; overflow-y: auto;
   }
-  form { display: flex; gap: 8px; padding: 14px 20px; background: #262638; border-top: 1px solid #3a3a52; }
+  .prompt-box .trace-body { padding: 10px 12px; border-top: 1px solid #3a3a52; background: #11111a; }
+  .trace-path { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 8px; }
+  .trace-path .node { background: #2e2e42; color: #c3c3e0; padding: 2px 8px; border-radius: 6px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .trace-path .node.wait { background: #6b4a12; color: #ffd27a; }
+  .trace-path .arrow { color: #5a5a7a; }
+  .trace-events { margin: 0; padding-left: 18px; color: #b5b5d0; line-height: 1.6; }
+  .trace-meta { margin-top: 8px; color: #7a7a9a; }
+
+  /* 추천 결과 */
+  .result { max-width: 640px; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .notice {
+    padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5;
+    background: #3b3320; border: 1px solid #7a6330; color: #ffe2a8;
+  }
+  .notice.info { background: #222a3a; border-color: #3a4a6a; color: #b8cdf0; }
+  .notice strong { font-weight: 700; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .card {
+    background: #2e2e42; border: 1px solid #3a3a52; border-radius: 12px; padding: 12px;
+    display: flex; flex-direction: column; gap: 6px; font-size: 13px;
+  }
+  .card .name { font-size: 15px; font-weight: 700; }
+  .card .cat { color: #8b8bd8; font-size: 11px; font-weight: 400; margin-left: 6px; }
+  .card .facts { color: #c3c3e0; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .card .reason { line-height: 1.5; color: #e2e2f0; flex: 1; }
+  .card .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .card .tag { background: #23233a; color: #a0a0c8; font-size: 11px; padding: 1px 6px; border-radius: 6px; }
+  .badge {
+    align-self: flex-start; background: #1f3b2c; color: #8fe0b0; border: 1px solid #2f6b4a;
+    font-size: 11px; padding: 2px 8px; border-radius: 8px; cursor: help;
+  }
+  .card button { padding: 7px 10px; font-size: 13px; }
+  .card button.eaten { background: #2f6b4a; }
+  .summary { font-size: 13px; color: #c3c3e0; padding: 0 4px; }
+
+  /* 승인 카드 */
+  .approval {
+    max-width: 520px; background: #2e2e42; border: 1px solid #7a6330; border-radius: 12px;
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.5;
+  }
+  .approval .sub { font-size: 12px; color: #b5b5d0; }
+  .approval .buttons { display: flex; gap: 8px; }
+  .approval button.reject { background: #4a4a68; }
+  .approval .state { font-size: 12px; color: #9a9ac0; }
+
+  /* 예시 칩 */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 20px 0; background: #262638; border-top: 1px solid #3a3a52; }
+  .chip {
+    padding: 5px 10px; font-size: 12px; border-radius: 14px; background: #1e1e2e;
+    border: 1px solid #3a3a52; color: #c3c3e0;
+  }
+  .chip:hover { border-color: #5b5bd6; }
+  .pending-hint { padding: 8px 20px 0; background: #262638; font-size: 12px; color: #ffd27a; }
+  form { display: flex; gap: 8px; padding: 10px 20px 14px; background: #262638; }
   input {
-    flex: 1; padding: 11px 14px; border-radius: 10px; border: 1px solid #3a3a52;
+    flex: 1; min-width: 0; padding: 11px 14px; border-radius: 10px; border: 1px solid #3a3a52;
     background: #1e1e2e; color: #e2e2f0; font-size: 14px;
   }
   input:focus { outline: 1px solid #5b5bd6; }
@@ -74,136 +140,769 @@
     padding: 11px 20px; border-radius: 10px; border: none; background: #5b5bd6;
     color: white; font-size: 14px; cursor: pointer;
   }
-  button:disabled { background: #3a3a52; cursor: default; }
+  button:disabled { background: #3a3a52; color: #8a8aa8; cursor: default; }
+
+  /* 식사 기록 */
+  aside {
+    width: 260px; flex-shrink: 0; background: #22222f; border-left: 1px solid #3a3a52;
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  aside h2 { margin: 0; padding: 14px 16px 6px; font-size: 14px; }
+  aside .sub { padding: 0 16px 10px; font-size: 12px; color: #9a9ac0; }
+  aside ul { list-style: none; margin: 0; padding: 0 8px 12px; overflow-y: auto; flex: 1; }
+  aside li { display: flex; justify-content: space-between; gap: 8px; padding: 8px; border-radius: 8px; font-size: 13px; }
+  aside li:nth-child(odd) { background: #2a2a3c; }
+  aside li .when { color: #9a9ac0; font-size: 12px; white-space: nowrap; }
+  aside .empty { padding: 8px 16px; font-size: 13px; color: #7a7a9a; }
+  aside .err { padding: 8px 16px; font-size: 12px; color: #f2a0b2; }
+  @media (max-width: 820px) {
+    aside { display: none; position: absolute; right: 0; top: 0; bottom: 0; z-index: 5; box-shadow: -6px 0 18px rgba(0,0,0,.4); }
+    aside.open { display: flex; }
+    .bubble, .steps, .prompt-box { max-width: 88%; }
+    #log, form { padding-left: 16px; padding-right: 16px; }
+    .chips, .pending-hint { padding-left: 16px; padding-right: 16px; }
+  }
+  @media (min-width: 821px) { header .meal-toggle { display: none; } }
 </style>
 </head>
 <body>
 <div id="app">
-  <header>운영 인시던트 대응 에이전트 <span>{{ backendLabel }}</span></header>
-  <div id="log" ref="logEl">
-    <template v-for="item in log" :key="item.id">
-      <div v-if="item.kind === 'user'" class="row user">
-        <div class="bubble">{{ item.text }}</div>
+  <header>
+    <span class="title">오늘뭐먹지</span>
+    <span class="desc">식사 상황을 한 문장으로 적으면 조건에 맞는 메뉴를 3개까지 추천해요</span>
+    <span v-if="mock" class="mock-tag">목업 모드</span>
+    <span class="label">{{ backendLabel }}</span>
+    <button class="meal-toggle" type="button" @click="mealsOpen = !mealsOpen">식사 기록 {{ meals.length }}</button>
+  </header>
+
+  <div class="layout">
+    <div class="main">
+      <div id="log" ref="logEl">
+        <template v-for="item in log" :key="item.id">
+          <div v-if="item.kind === 'user'" class="row user">
+            <div class="bubble">{{ item.text }}</div>
+          </div>
+
+          <div v-else-if="item.kind === 'steps'" class="steps">
+            <div v-for="(step, i) in item.steps" :key="i" class="step">{{ step }}</div>
+            <div v-if="item.loading" class="loading">{{ item.loadingText || '처리 중' }}</div>
+          </div>
+
+          <div v-else-if="item.kind === 'agent'" class="row agent">
+            <div class="bubble">{{ item.text }}</div>
+          </div>
+
+          <div v-else-if="item.kind === 'error'" class="row error">
+            <div class="bubble">{{ item.text }}<span v-if="item.code" class="code">{{ item.status }} {{ item.code }}</span></div>
+          </div>
+
+          <div v-else-if="item.kind === 'result'" class="result">
+            <div v-for="(line, i) in relaxLines(item.resp.relaxed)" :key="'r' + i" class="notice">
+              <strong>조건 완화</strong> · {{ line }}
+            </div>
+            <div v-for="(line, i) in excludedLines(item.resp.excluded)" :key="'x' + i" class="notice info">{{ line }}</div>
+            <div v-if="item.resp.metadata && item.resp.metadata.cancelled_pending" class="notice info">
+              대기 중이던 조건 완화 제안은 취소하고 새 질문으로 찾았어요.
+            </div>
+            <div class="cards">
+              <div v-for="k in item.resp.kept" :key="k.name" class="card">
+                <div class="name">{{ k.name }}<span class="cat">{{ k.category }}</span></div>
+                <div class="facts">
+                  <span>{{ won(k.price) }}</span>
+                  <span>{{ k.minutes }}분</span>
+                  <span>{{ spicyLabel(k.spicy) }}</span>
+                </div>
+                <span v-if="reviewFlagFor(item.resp, k)" class="badge" :title="reviewTitle(reviewFlagFor(item.resp, k))">
+                  이유 문장을 데이터 기준으로 고쳤어요
+                </span>
+                <div class="reason">{{ k.reason }}</div>
+                <div class="tags">
+                  <span v-for="t in k.tags" :key="t" class="tag">#{{ t }}</span>
+                  <span v-if="k.allergens && k.allergens.length" class="tag">알레르기: {{ k.allergens.join(', ') }}</span>
+                </div>
+                <button type="button" :class="{ eaten: item.eaten[k.name] === 'done' }"
+                        :disabled="!!item.eaten[k.name]" @click="markEaten(item, k.name)">
+                  {{ item.eaten[k.name] === 'done' ? '기록했어요' : item.eaten[k.name] === 'saving' ? '저장 중' : '먹었어요' }}
+                </button>
+              </div>
+            </div>
+            <div v-if="item.resp.summary" class="summary">{{ item.resp.summary }}</div>
+          </div>
+
+          <div v-else-if="item.kind === 'approval'" class="approval">
+            <div>{{ proposalText(item.proposal) }}</div>
+            <div class="sub">
+              {{ proposalReason(item.proposal) }}
+              <template v-if="item.proposal.expected_count != null"> (바꾸면 {{ item.proposal.expected_count }}개 메뉴가 조건에 맞아요)</template>
+            </div>
+            <div class="sub">알레르기, 맵기, 끼니 조건은 바꾸지 않아요.</div>
+            <div v-if="item.state === 'pending' || item.state === 'sending'" class="buttons">
+              <button type="button" :disabled="item.state !== 'pending' || sending" @click="resume(item, true)">승인</button>
+              <button type="button" class="reject" :disabled="item.state !== 'pending' || sending" @click="resume(item, false)">거절</button>
+            </div>
+            <div v-else class="state">{{ APPROVAL_STATE_LABELS[item.state] }}</div>
+          </div>
+
+          <details v-else-if="item.kind === 'trace'" class="prompt-box">
+            <summary>처리 흐름 보기 ({{ item.resp.trace.length }}단계)</summary>
+            <div class="trace-body">
+              <div class="trace-path">
+                <template v-for="(node, i) in item.resp.trace" :key="i">
+                  <span v-if="i > 0" class="arrow">→</span>
+                  <span class="node" :class="{ wait: node === 'approve_relax' && i === item.resp.trace.length - 1 && item.resp.status === 'needs_approval' }">{{ node }}</span>
+                </template>
+              </div>
+              <ol class="trace-events">
+                <li v-for="(e, i) in item.resp.events" :key="i">{{ e.node }} · {{ eventLabel(e) || e.type }}</li>
+              </ol>
+              <div v-if="item.resp.metadata" class="trace-meta">
+                LLM 호출 {{ item.resp.metadata.llm_calls }}회 · {{ item.resp.metadata.elapsed_ms }}ms ·
+                추천 {{ item.resp.metadata.attempts }}회 · 완화 {{ item.resp.metadata.relax_count }}회 ·
+                ${{ item.resp.metadata.cost_usd }} · review {{ item.resp.metadata.review_mode }}
+                <template v-if="item.resp.metadata.fallback && item.resp.metadata.fallback.length"> · 폴백: {{ item.resp.metadata.fallback.join(', ') }}</template>
+                <template v-if="item.resp.metadata.mcp_retries"> · MCP 재시도 {{ item.resp.metadata.mcp_retries }}회</template>
+              </div>
+            </div>
+          </details>
+
+          <details v-else-if="item.kind === 'prompt'" class="prompt-box">
+            <summary>LLM에 전달된 최종 프롬프트 보기</summary>
+            <pre>{{ item.text }}</pre>
+          </details>
+        </template>
       </div>
 
-      <div v-else-if="item.kind === 'steps'" class="steps">
-        <div v-for="(step, i) in item.steps" :key="i" class="step">{{ step }}</div>
+      <div class="chips">
+        <button v-for="c in EXAMPLES" :key="c.label" type="button" class="chip" @click="fillExample(c.text)">{{ c.label }}</button>
       </div>
+      <div v-if="pendingItem" class="pending-hint">새 질문을 보내면 대기 중인 조건 완화 제안은 취소돼요.</div>
+      <form @submit.prevent="onSubmit">
+        <input
+          v-model="input"
+          ref="inputEl"
+          autocomplete="off"
+          placeholder="예: 혼자 먹을 건데 만원 안쪽으로 20분 안에 되는 거 없을까"
+        />
+        <button type="submit" :disabled="sending || !input.trim()">{{ sending ? '처리 중' : '보내기' }}</button>
+      </form>
+    </div>
 
-      <div v-else-if="item.kind === 'agent'" class="row agent">
-        <div class="bubble">{{ item.text }}</div>
-      </div>
-
-      <details v-else-if="item.kind === 'prompt'" class="prompt-box">
-        <summary>LLM에 전달된 최종 프롬프트 보기</summary>
-        <pre>{{ item.text }}</pre>
-      </details>
-    </template>
+    <aside :class="{ open: mealsOpen }">
+      <h2>최근 먹은 메뉴</h2>
+      <div class="sub">최근 7일 · 3일 안에 먹은 메뉴는 추천에서 빠져요</div>
+      <div v-if="mealsError" class="err">{{ mealsError }}</div>
+      <ul v-if="meals.length">
+        <li v-for="m in meals" :key="m.id">
+          <span>{{ m.menu_name }}</span><span class="when">{{ formatTime(m.eaten_at) }}</span>
+        </li>
+      </ul>
+      <div v-else-if="!mealsError" class="empty">아직 기록이 없어요. 추천 카드의 "먹었어요"를 눌러 보세요.</div>
+    </aside>
   </div>
-  <form @submit.prevent="onSubmit">
-    <input
-      v-model="input"
-      autocomplete="off"
-      placeholder="예: auth-service 로그인 응답이 느려졌어요. 원인 확인해주세요"
-    />
-    <button type="submit" :disabled="sending">보내기</button>
-  </form>
 </div>
 
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
 <script>
-const { createApp, ref, reactive, nextTick } = Vue;
+// ─────────────────────────────────────────────────────────────────────────────
+// 목업: ?mock=1 이면 백엔드 없이 계약(_workspace/01_architect_contracts.md §2-3)
+// 예시 응답 a~h 로 /chat/stream, /chat/resume, /chat/pending, /meals, /health 를 흉내낸다.
+// ?mock=1&mock_mode=bad_reason 이면 case1 응답에 예시 (f) 의 review 수정을 얹는다.
+// 목업 메시지에 "오류테스트" 가 들어 있으면 SSE Error(502 LLM_ERROR) 를 보낸다.
+// ─────────────────────────────────────────────────────────────────────────────
+const PARAMS = new URLSearchParams(location.search);
+const MOCK = PARAMS.get('mock') === '1';
+const MOCK_MODE = PARAMS.get('mock_mode') || 'normal';
 
+const MockApi = (() => {
+  const C1 = { budget: 10000, max_minutes: 20, spicy_ok: null, avoid_keywords: ['기름진', '닭고기'], prefer_keywords: ['속편한'], allergies: [], people: 1, meal: null };
+  const C3 = { budget: 5000, max_minutes: null, spicy_ok: null, avoid_keywords: [], prefer_keywords: [], allergies: ['밀'], people: 1, meal: null };
+  const PROPOSAL = { field: 'budget', label: '예산', unit: '원', from: 5000, to: 8500, expected_count: 3 };
+  const MENUS = {
+    '된장찌개': { name: '된장찌개', category: '한식', price: 8500, minutes: 15, spicy: 0, tags: ['국물', '속편한', '혼밥'], allergens: ['대두'] },
+    '북엇국': { name: '북엇국', category: '한식', price: 9000, minutes: 10, spicy: 0, tags: ['국물', '해장', '속편한', '담백한'], allergens: ['계란'] },
+    '콩나물국밥': { name: '콩나물국밥', category: '한식', price: 8000, minutes: 10, spicy: 1, tags: ['국물', '해장', '속편한', '혼밥'], allergens: ['대두', '계란'] },
+    '볶음밥': { name: '볶음밥', category: '중식', price: 8000, minutes: 10, spicy: 0, tags: ['볶음', '혼밥', '담백한'], allergens: ['계란', '대두'] },
+  };
+  const kept = (name, reason, review_fixed = false) => ({ ...MENUS[name], reason, review_fixed });
+  const meta = (o) => ({
+    contract_version: '1.0', route: 'menu', llm_backend: 'fake', fast_llm: 'fast-model-stub',
+    quality_llm: 'quality-model-stub', review_mode: 'llm', llm_calls: 4, cost_usd: 0.000412, attempts: 1,
+    relax_count: 0, elapsed_ms: 38, fallback: [], mcp_retries: 0, cancelled_pending: false,
+    checkpointer: 'sqlite', instance_id: 4372119504, langsmith_run_id: null, ...o,
+  });
+  const base = (o) => ({
+    status: 'done', route: 'menu', user_id: '', reply: '', kept: [], relaxed: [], proposal: null, summary: '',
+    no_result_reason: null, review_flags: [], dropped: [], constraints: null,
+    excluded: { recent: [], eaten: [] }, trace: [], events: [], prompt: null, metadata: meta({}), ...o,
+  });
+  const ev = {
+    route: (route) => ({ type: 'RouteDecided', node: 'route', route }),
+    extract: (c) => ({ type: 'ConstraintsExtracted', node: 'extract', constraints: c, fallback: false }),
+    filter: (count, relax_count, excluded_recent = 0, excluded_eaten = 0) => ({ type: 'CandidatesFiltered', node: 'filter', count, relax_count, excluded_recent, excluded_eaten }),
+  };
+
+  // (a) case1 done
+  function caseA() {
+    const picks = ['된장찌개', '북엇국', '콩나물국밥'];
+    return base({
+      reply: '1. 된장찌개 (8,500원, 15분) - 속편한 된장 국물이라 술 마신 다음 날 부담이 적어요.\n2. 북엇국 (9,000원, 10분) - 해장용 맑은 국물이라 쓰린 속을 달래기 좋아요.\n3. 콩나물국밥 (8,000원, 10분) - 콩나물 국물이 시원해서 숙취 해소에 잘 맞아요.\n기름기 없이 속을 편하게 해 주는 국물 메뉴로 골랐어요.',
+      kept: [
+        kept('된장찌개', '속편한 된장 국물이라 술 마신 다음 날 부담이 적어요.'),
+        kept('북엇국', '해장용 맑은 국물이라 쓰린 속을 달래기 좋아요.'),
+        kept('콩나물국밥', '콩나물 국물이 시원해서 숙취 해소에 잘 맞아요.'),
+      ],
+      summary: '기름기 없이 속을 편하게 해 주는 국물 메뉴로 골랐어요.',
+      constraints: { ...C1 },
+      trace: ['route', 'extract', 'filter', 'recommend', 'verify', 'review', 'remember', 'finalize'],
+      events: [
+        ev.route('menu'), ev.extract({ ...C1 }), ev.filter(10, 0),
+        { type: 'Recommended', node: 'recommend', attempt: 1, picks, candidate_count: 10 },
+        { type: 'Verified', node: 'verify', kept: picks, dropped: [] },
+        { type: 'Reviewed', node: 'review', mode: 'llm', flagged: [] },
+        { type: 'Remembered', node: 'remember', recent: picks },
+        { type: 'Finalize', node: 'finalize', pipeline: 'menu' },
+      ],
+    });
+  }
+  // (f) bad_reason: (a) 에 review 수정 덧씌움
+  function applyBadReason(r) {
+    const fixed = '국물, 해장 특징이 있는 한식 메뉴예요.';
+    r.kept = r.kept.map(k => k.name === '북엇국' ? { ...k, reason: fixed, review_fixed: true } : k);
+    r.review_flags = [{ name: '북엇국', source: 'rules', issue: "이유에 '매운'이 있지만 맵기 0", original_reason: '매운맛이 강해 스트레스가 풀려요.', fixed_reason: fixed }];
+    r.events.find(e => e.type === 'Reviewed').flagged = ['북엇국'];
+    return r;
+  }
+  // (b) case3 needs_approval
+  function caseB() {
+    return base({
+      status: 'needs_approval',
+      reply: '예산 5,000원 안에서는 조건에 맞는 메뉴가 없어요. 예산을 8,500원으로 올려서 찾아볼까요?',
+      proposal: { ...PROPOSAL }, constraints: { ...C3 },
+      trace: ['route', 'extract', 'filter', 'approve_relax'],
+      events: [ev.route('menu'), ev.extract({ ...C3 }), ev.filter(0, 0), { type: 'NeedsApproval', node: 'approve_relax', proposal: { ...PROPOSAL } }],
+      metadata: meta({ llm_calls: 2, cost_usd: 0.000061, attempts: 0, elapsed_ms: 21 }),
+    });
+  }
+  // (c) resume approved
+  function caseC() {
+    const picks = ['된장찌개', '콩나물국밥', '볶음밥'];
+    return base({
+      reply: '조건 완화: 예산 5,000원 → 8,500원\n1. 된장찌개 (8,500원, 15분) - 밀이 들어가지 않은 된장 국물이라 안심하고 먹을 수 있어요.\n2. 콩나물국밥 (8,000원, 10분) - 밥과 국물로 든든하면서 밀 걱정이 없어요.\n3. 볶음밥 (8,000원, 10분) - 면 대신 밥으로 만든 담백한 한 끼예요.\n밀가루 없이 밥과 국물 위주로 골랐어요.',
+      kept: [
+        kept('된장찌개', '밀이 들어가지 않은 된장 국물이라 안심하고 먹을 수 있어요.'),
+        kept('콩나물국밥', '밥과 국물로 든든하면서 밀 걱정이 없어요.'),
+        kept('볶음밥', '면 대신 밥으로 만든 담백한 한 끼예요.'),
+      ],
+      relaxed: [{ field: 'budget', label: '예산', unit: '원', from: 5000, to: 8500 }],
+      summary: '밀가루 없이 밥과 국물 위주로 골랐어요.',
+      constraints: { ...C3, budget: 8500 },
+      trace: ['route', 'extract', 'filter', 'approve_relax', 'relax', 'filter', 'recommend', 'verify', 'review', 'remember', 'finalize'],
+      events: [
+        ev.route('menu'), ev.extract({ ...C3 }), ev.filter(0, 0),
+        { type: 'RelaxDecision', node: 'approve_relax', approved: true, proposal: { ...PROPOSAL } },
+        { type: 'RelaxApplied', node: 'relax', field: 'budget', from: 5000, to: 8500 },
+        ev.filter(3, 1),
+        { type: 'Recommended', node: 'recommend', attempt: 1, picks, candidate_count: 3 },
+        { type: 'Verified', node: 'verify', kept: picks, dropped: [] },
+        { type: 'Reviewed', node: 'review', mode: 'llm', flagged: [] },
+        { type: 'Remembered', node: 'remember', recent: picks },
+        { type: 'Finalize', node: 'finalize', pipeline: 'menu' },
+      ],
+      metadata: meta({ cost_usd: 0.000398, relax_count: 1, elapsed_ms: 27 }),
+    });
+  }
+  // (d) resume rejected
+  function caseD() {
+    const msg = '조건을 풀지 않고는 맞는 메뉴가 없어요. 예산이나 시간을 바꿔서 다시 물어봐 주세요. 알레르기, 맵기, 끼니 조건은 풀지 않았습니다.';
+    return base({
+      status: 'no_result', reply: msg, summary: msg, no_result_reason: 'relax_rejected', constraints: { ...C3 },
+      trace: ['route', 'extract', 'filter', 'approve_relax', 'no_result', 'finalize'],
+      events: [
+        ev.route('menu'), ev.extract({ ...C3 }), ev.filter(0, 0),
+        { type: 'RelaxDecision', node: 'approve_relax', approved: false, proposal: { ...PROPOSAL } },
+        { type: 'NoResult', node: 'no_result', reason: 'relax_rejected' },
+        { type: 'Finalize', node: 'finalize', pipeline: 'menu-no-result' },
+      ],
+      metadata: meta({ llm_calls: 2, cost_usd: 0.000061, attempts: 0, elapsed_ms: 9 }),
+    });
+  }
+  // (e) chat
+  function caseE(reply) {
+    return base({
+      status: 'chat', route: 'chat', reply, constraints: null,
+      trace: ['route', 'chat_answer'],
+      events: [ev.route('chat'), { type: 'Finalize', node: 'chat_answer', pipeline: 'chat-direct' }],
+      metadata: meta({ route: 'chat', llm_calls: 2, cost_usd: 0.000032, attempts: 0, elapsed_ms: 6 }),
+    });
+  }
+  const err = (status, code, message) => ({ status, body: { detail: { code, message } } });
+
+  // 서버 쪽 상태 흉내(사용자 1명분이면 충분)
+  const state = { pending: false, recent: [], meals: [], nextMealId: 1, name: null };
+  const MENU_RE = /먹|메뉴|점심|저녁|아침|야식|간식|배고|식사|추천|예산|알레르기|해장|매운|맵/;
+
+  function validate(message) {
+    const m = (message || '').trim();
+    if (!m) return err(400, 'EMPTY_MESSAGE', '메시지를 입력해 주세요.');
+    if (m.length > 500) return err(400, 'MESSAGE_TOO_LONG', '메시지는 500자 이내로 입력해 주세요.');
+    if (m.includes('오류테스트')) return err(502, 'LLM_ERROR', 'LLM 호출에 실패했습니다: (목업) 타임아웃');
+    return null;
+  }
+  function eatenRecent(days) {
+    const since = Date.now() - days * 86400000;
+    return state.meals.filter(m => new Date(m.eaten_at).getTime() >= since);
+  }
+  function remember(kept) {
+    const names = kept.map(k => k.name);
+    state.recent = [...state.recent.filter(n => !names.includes(n)), ...names].slice(-6);
+  }
+  function chat(message, userId) {
+    const bad = validate(message);
+    if (bad) return { error: bad };
+    const cancelled = state.pending;
+    state.pending = false;
+    let r;
+    if (!MENU_RE.test(message)) {
+      const nm = message.match(/제 이름은\s*(\S+?)(입니다|이에요|예요)?$/);
+      if (nm) state.name = nm[1];
+      let reply = '안녕하세요! 오늘뭐먹지 도우미예요. 식사 상황을 한 문장으로 적어 주시면 조건에 맞는 메뉴를 3개까지 추천해 드려요.';
+      if (nm) reply = `반가워요, ${state.name}님! 식사 상황을 알려 주시면 메뉴를 추천해 드릴게요.`;
+      else if (/이름/.test(message)) reply = state.name ? `${state.name}님이라고 하셨어요.` : '아직 이름을 알려 주지 않으셨어요.';
+      r = caseE(reply);
+    } else if (/5000|5,000|오천/.test(message) && /밀/.test(message)) {
+      r = caseB();
+      state.pending = true;
+    } else {
+      r = caseA();
+      if (MOCK_MODE === 'bad_reason') applyBadReason(r);
+      // (g) 재방문: 이전 추천·최근 3일 먹은 메뉴를 excluded 에 싣는다(목업이라 kept 는 그대로)
+      const eaten = [...new Set(eatenRecent(3).map(m => m.menu_name))];
+      r.excluded = { recent: state.recent.slice(-6), eaten };
+      r.events[2].excluded_recent = r.excluded.recent.length;
+      r.events[2].excluded_eaten = eaten.length;
+      remember(r.kept);
+    }
+    r.user_id = userId;
+    r.metadata.cancelled_pending = cancelled;
+    return { response: r };
+  }
+  function resume(body) {
+    if (typeof body.approved !== 'boolean') return err(422, 'INVALID_REQUEST', '요청 형식이 올바르지 않습니다.');
+    if (!state.pending) return err(409, 'NO_PENDING_APPROVAL', '승인 대기 중인 요청이 없습니다. 다시 질문해 주세요.');
+    state.pending = false;
+    const r = body.approved ? caseC() : caseD();
+    if (body.approved) remember(r.kept);
+    r.user_id = body.user_id;
+    return { status: 200, body: r };
+  }
+
+  function fetchMock(path, opts = {}) {
+    const url = new URL(path, location.origin);
+    const body = opts.body ? JSON.parse(opts.body) : {};
+    const method = (opts.method || 'GET').toUpperCase();
+    let res;
+    if (url.pathname === '/health') {
+      res = { status: 200, body: { status: 'ok', instance_id: 4372119504, creation_count: 1, llm_backend: 'fake', fast_llm: 'fast-model-stub', quality_llm: 'quality-model-stub', review_mode: 'llm', checkpointer: 'sqlite', menu_repo: 'mcp', menu_count: 36, contract_version: '1.0' } };
+    } else if (url.pathname === '/chat/resume' && method === 'POST') {
+      res = resume(body);
+    } else if (url.pathname === '/chat/pending') {
+      res = { status: 200, body: { pending: state.pending, proposal: state.pending ? { ...PROPOSAL } : null } };
+    } else if (url.pathname === '/meals' && method === 'POST') {
+      if (!MENUS[body.menu_name]) res = err(404, 'UNKNOWN_MENU', `메뉴 목록에 없는 이름입니다: ${body.menu_name}`);
+      else {
+        const d = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const eaten_at = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        const item = { id: state.nextMealId++, menu_name: body.menu_name, eaten_at };
+        state.meals.unshift(item);
+        res = { status: 200, body: { ok: true, item } };
+      }
+    } else if (url.pathname === '/meals') {
+      const days = Number(url.searchParams.get('days') || 7);
+      res = { status: 200, body: { user_id: url.searchParams.get('user_id'), days, items: eatenRecent(days) } };
+    } else {
+      res = err(500, 'INTERNAL_ERROR', '서버 오류가 발생했습니다.');
+    }
+    return new Promise(resolve => setTimeout(() => resolve(res), 200));
+  }
+
+  // EventSource 와 같은 모양(onmessage/onerror/close). 이벤트를 하나씩 시간차로 흘린다.
+  class MockEventSource {
+    constructor(path) {
+      const url = new URL(path, location.origin);
+      this.timers = [];
+      this.onmessage = null;
+      this.onerror = null;
+      const out = chat(url.searchParams.get('message'), url.searchParams.get('user_id'));
+      const frames = [];
+      if (out.error) {
+        frames.push({ type: 'Error', status_code: out.error.status, detail: out.error.body.detail });
+      } else {
+        const r = out.response;
+        for (const e of r.events) {
+          // chat 경로는 Finalize 전에 AnswerToken 을 흘린다(sample 관례)
+          if (e.node === 'chat_answer') {
+            for (let i = 0; i < r.reply.length; i += 6) frames.push({ type: 'AnswerToken', delta: r.reply.slice(i, i + 6) });
+          }
+          frames.push(e);
+        }
+        frames.push({ type: 'FinalAnswer', reply: r.reply, prompt: r.prompt, response: r });
+      }
+      frames.push('[DONE]');
+      frames.forEach((f, i) => {
+        const delay = 150 + i * (f.type === 'AnswerToken' ? 40 : 220);
+        this.timers.push(setTimeout(() => {
+          if (this.onmessage) this.onmessage({ data: typeof f === 'string' ? f : JSON.stringify(f) });
+        }, delay));
+      });
+    }
+    close() { this.timers.forEach(clearTimeout); this.timers = []; }
+  }
+
+  return { fetch: fetchMock, EventSource: MockEventSource };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API 계층: 실제/목업을 여기서만 가른다. 응답은 항상 {ok, status, body}.
+// ─────────────────────────────────────────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  if (MOCK) {
+    const r = await MockApi.fetch(path, opts);
+    return { ok: r.status < 400, status: r.status, body: r.body };
+  }
+  const r = await fetch(path, opts);
+  let body = null;
+  try { body = await r.json(); } catch { body = null; }
+  return { ok: r.ok, status: r.status, body };
+}
+const postJson = (path, data) => apiFetch(path, {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data),
+});
+const openStream = (path) => (MOCK ? new MockApi.EventSource(path) : new EventSource(path));
+
+// 오류 본문 {"detail":{"code","message"}} 에서 서버 메시지를 꺼낸다
+function errorInfo(body, status) {
+  const d = body && body.detail;
+  if (d && typeof d === 'object' && !Array.isArray(d) && d.message) return { text: d.message, code: d.code || '', status };
+  if (typeof d === 'string') return { text: d, code: '', status };
+  return { text: `요청을 처리하지 못했어요. (HTTP ${status})`, code: '', status };
+}
+
+function getUserId() {
+  const KEY = 'today-menu-user-id';
+  try {
+    const saved = localStorage.getItem(KEY);
+    if (saved && /^[A-Za-z0-9_-]{1,64}$/.test(saved)) return saved;
+    const id = 'u-' + Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+    localStorage.setItem(KEY, id);
+    return id;
+  } catch {
+    return 'u-' + Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+  }
+}
+
+const EXAMPLES = [
+  { label: '해장 혼밥', text: '어제 술 먹고 치킨까지 먹어서 속이 안 좋아. 기름진 건 못 먹겠고 혼자 먹을 건데 만원 안쪽으로 20분 안에 되는 거 없을까' },
+  { label: '다음 날 또', text: '오늘도 속이 별로야. 어제처럼 만원 안쪽으로 20분 안에 먹을 수 있는 걸로 추천해 줘' },
+  { label: '친구들과 매운 저녁', text: '친구 세 명이랑 저녁 먹는데 매운 게 당겨. 예산은 1인 15000원까지 괜찮고 시간은 넉넉해. 새우 알레르기 있는 친구가 있어' },
+  { label: '5000원 + 밀 알레르기', text: '돈이 없어서 5000원 안쪽으로 먹어야 해. 근데 밀가루 알레르기 있어서 면이랑 빵은 못 먹어' },
+  { label: '인사', text: '안녕하세요. 어떤 일을 할 수 있나요?' },
+];
+
+const won = (n) => (typeof n === 'number' ? n.toLocaleString('ko-KR') + '원' : '-');
+const withUnit = (v, unit) => (unit === '원' ? won(v) : `${v}${unit}`);
+const SPICY = ['안 매움', '약간 매움', '매움', '아주 매움'];
+const NO_RESULT_LABELS = {
+  relax_rejected: '조건 완화를 거절함',
+  relax_exhausted: '완화 횟수를 다 씀',
+  nothing_to_relax: '풀 수 있는 조건이 없음',
+  verify_failed: '검증을 통과한 메뉴가 없음',
+};
+
+// 처리 단계 라벨 (계약 §3 Event 타입)
 const STEP_LABELS = {
-  PlanCreated: e => `계획 수립: 할 일 ${e.task_count}가지${e.targets?.length ? ` (시스템: ${e.targets.join(', ')})` : ''}`,
-  GateApplied: e => e.removed_analysis_tasks ? `불필요한 작업 ${e.removed_analysis_tasks}건 제거` : null,
-  TaskCompleted: e => (e.source === 'monitoring'
-      ? `모니터링 지표 확인 (시스템: ${e.target})`
-      : `대응 매뉴얼(runbook) 조회 (장애유형: ${e.target})`) + (e.retries ? ' (재시도 성공)' : ''),
-  ReplanCheck: e => e.is_sufficient ? null : `정보 부족 → 장애유형 "${e.target}"로 추가 조사`,
-  DraftWritten: e => `답변 초안 작성 (시도 ${e.attempt})`,
-  Validation: e => e.verdict === '합격' ? '검수 통과' : '검수 반려 → 다시 작성',
+  RouteDecided: e => (e.route === 'menu' ? '메뉴 추천 요청으로 분류' : '일반 대화로 분류'),
+  ConstraintsExtracted: e => `조건 추출${e.fallback ? ' (규칙 추출로 대체)' : ''}: ${constraintsText(e.constraints)}`,
+  CandidatesFiltered: e => `후보 ${e.count}개 추림` +
+      (e.excluded_recent ? ` · 최근 추천 ${e.excluded_recent}개 제외` : '') +
+      (e.excluded_eaten ? ` · 최근 먹은 메뉴 ${e.excluded_eaten}개 제외` : ''),
+  NeedsApproval: e => `조건 완화 승인 대기: ${e.proposal.label} ${withUnit(e.proposal.from, e.proposal.unit)} → ${withUnit(e.proposal.to, e.proposal.unit)}`,
+  RelaxDecision: e => (e.approved ? '조건 완화 승인됨' : '조건 완화 거절됨'),
+  RelaxApplied: e => `조건 완화 적용: ${e.field === 'budget' ? '예산' : '시간'} ${withUnit(e.from, e.field === 'budget' ? '원' : '분')} → ${withUnit(e.to, e.field === 'budget' ? '원' : '분')}`,
+  Recommended: e => `추천 ${e.attempt}회차: ${e.picks.join(', ')}`,
+  Verified: e => (e.dropped.length
+      ? `검증: ${e.dropped.map(d => `${d.name}(${d.why})`).join(', ')} 제외`
+      : '검증 통과'),
+  Reviewed: e => (e.flagged.length ? `이유 검토: ${e.flagged.join(', ')} 문장 수정` : `이유 검토 통과 (${e.mode})`),
+  Remembered: () => '추천 기록 저장',
+  NoResult: e => `추천 불가: ${NO_RESULT_LABELS[e.reason] || e.reason}`,
   Finalize: () => '최종 답변 완성',
 };
 
+function constraintsText(c) {
+  if (!c) return '-';
+  const parts = [];
+  if (c.budget != null) parts.push(`예산 ${won(c.budget)}`);
+  if (c.max_minutes != null) parts.push(`${c.max_minutes}분 이내`);
+  if (c.allergies && c.allergies.length) parts.push(`알레르기 ${c.allergies.join(', ')}`);
+  if (c.spicy_ok === true) parts.push('매운 것 좋음');
+  if (c.spicy_ok === false) parts.push('매운 것 싫음');
+  if (c.meal) parts.push(c.meal);
+  if (c.people && c.people > 1) parts.push(`${c.people}명`);
+  if (c.avoid_keywords && c.avoid_keywords.length) parts.push(`피함: ${c.avoid_keywords.join(', ')}`);
+  return parts.join(' · ') || '조건 없음';
+}
+
+const APPROVAL_STATE_LABELS = {
+  approved: '승인했어요. 완화한 조건으로 다시 찾았어요.',
+  rejected: '거절했어요. 조건을 그대로 두었어요.',
+  cancelled: '새 질문을 보내서 이 제안은 취소됐어요.',
+  expired: '이 제안은 더 이상 유효하지 않아요.',
+};
+
+const { createApp, ref, reactive, nextTick } = Vue;
+
 createApp({
   setup() {
-    const backendLabel = ref('all_total_vue');
+    const backendLabel = ref('');
     const log = ref([]);
     const input = ref('');
     const sending = ref(false);
     const logEl = ref(null);
-    const thread = 't-web-' + Math.random().toString(36).slice(2, 8);
+    const inputEl = ref(null);
+    const meals = ref([]);
+    const mealsError = ref('');
+    const mealsOpen = ref(false);
+    const pendingItem = ref(null);   // 지금 승인 대기 중인 approval 항목
+    const userId = getUserId();
     let nextId = 0;
 
-    fetch('/health').then(r => r.json()).then(h => {
-      backendLabel.value = `${h.llm_backend} 실모델(${h.fast_llm}/${h.quality_llm}) · all_total_vue`;
-    }).catch(() => {});
+    apiFetch('/health').then(({ ok, body }) => {
+      if (!ok || !body) throw new Error();
+      backendLabel.value = `${body.llm_backend} (${body.fast_llm}/${body.quality_llm}) · review ${body.review_mode} · ${body.checkpointer} · ${userId}`;
+    }).catch(() => { backendLabel.value = `백엔드 연결 안 됨 · ${userId}`; });
 
     async function scrollToBottom() {
       await nextTick();
       if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight;
     }
 
+    function push(item) {
+      const it = reactive({ id: nextId++, ...item });
+      log.value.push(it);
+      scrollToBottom();
+      return it;
+    }
+
+    function pushError(info) {
+      push({ kind: 'error', text: info.text, code: info.code, status: info.status });
+    }
+
+    // ── 화면 문구: LLM 문장이 아니라 relaxed / proposal 값으로 만든다 ──
+    const josa = (label) => (label === '예산' || label === '시간' ? '을' : '을(를)');
+    function proposalText(p) {
+      const verb = p.field === 'max_minutes' ? '늘려서' : '올려서';
+      return `${p.label}${josa(p.label)} ${withUnit(p.from, p.unit)} → ${withUnit(p.to, p.unit)}으로 ${verb} 찾아볼까요?`;
+    }
+    function proposalReason(p) {
+      return `${p.label} ${withUnit(p.from, p.unit)} 안에서는 조건에 맞는 메뉴가 없어요.`;
+    }
+    function relaxLines(relaxed) {
+      return (relaxed || []).map(r => `${r.label} ${withUnit(r.from, r.unit)} → ${withUnit(r.to, r.unit)}으로 바꿔서 찾았어요`);
+    }
+    function excludedLines(ex) {
+      const lines = [];
+      if (ex && ex.recent && ex.recent.length) lines.push(`최근에 추천한 메뉴는 뺐어요: ${ex.recent.join(', ')}`);
+      if (ex && ex.eaten && ex.eaten.length) lines.push(`최근 3일 안에 먹은 메뉴는 뺐어요: ${ex.eaten.join(', ')}`);
+      return lines;
+    }
+    function reviewFlagFor(resp, k) {
+      const flag = (resp.review_flags || []).find(f => f.name === k.name);
+      if (flag) return flag;
+      return k.review_fixed ? { name: k.name } : null;
+    }
+    function reviewTitle(f) {
+      if (!f.original_reason) return '';
+      return `원래 문장: ${f.original_reason}\n문제: ${f.issue} (${f.source})`;
+    }
+    function eventLabel(e) {
+      const fn = STEP_LABELS[e.type];
+      try { return fn ? fn(e) : null; } catch { return null; }
+    }
+    const spicyLabel = (s) => SPICY[s] || `맵기 ${s}`;
+    function formatTime(iso) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
+      return m ? `${Number(m[2])}/${Number(m[3])} ${m[4]}:${m[5]}` : iso;
+    }
+
+    // ── ChatResponse 하나를 그린다 (SSE FinalAnswer.response, /chat/resume 공통) ──
+    function renderResponse(resp, streamItem) {
+      if (resp.status === 'chat') {
+        if (streamItem) streamItem.text = resp.reply;   // 토큰 합산 결과를 서버 최종 텍스트로 맞춘다
+        else push({ kind: 'agent', text: resp.reply });
+      } else if (resp.status === 'done') {
+        push({ kind: 'result', resp, eaten: {} });
+      } else if (resp.status === 'needs_approval') {
+        const item = push({ kind: 'approval', proposal: resp.proposal, state: 'pending' });
+        pendingItem.value = item;
+      } else if (resp.status === 'no_result') {
+        if (resp.metadata && resp.metadata.cancelled_pending) {
+          push({ kind: 'agent', text: '대기 중이던 조건 완화 제안은 취소하고 새 질문으로 찾았어요.' });
+        }
+        push({ kind: 'agent', text: resp.summary || resp.reply });
+      } else {
+        push({ kind: 'agent', text: resp.reply });
+      }
+      if (resp.route === 'menu' && resp.trace && resp.trace.length) push({ kind: 'trace', resp });
+      if (resp.prompt) push({ kind: 'prompt', text: resp.prompt });
+    }
+
+    function cancelPending(state) {
+      if (pendingItem.value) {
+        pendingItem.value.state = state;
+        pendingItem.value = null;
+      }
+    }
+
+    function fillExample(text) {
+      input.value = text;
+      nextTick(() => inputEl.value && inputEl.value.focus());
+    }
+
     function onSubmit() {
       const text = input.value.trim();
-      if (!text) return;
+      if (!text || sending.value) return;
 
-      log.value.push({ id: nextId++, kind: 'user', text });
+      cancelPending('cancelled');   // D8: 새 질문을 보내면 이전 승인 버튼은 비활성화
+      push({ kind: 'user', text });
       input.value = '';
       sending.value = true;
-      scrollToBottom();
 
-      const stepsItem = reactive({ id: nextId++, kind: 'steps', steps: [] });
-      log.value.push(stepsItem);
-      scrollToBottom();
-
-      const url = `/chat/stream?message=${encodeURIComponent(text)}&thread_id=${encodeURIComponent(thread)}`;
-      const es = new EventSource(url);
+      const stepsItem = push({ kind: 'steps', steps: [], loading: true });
+      const url = `/chat/stream?message=${encodeURIComponent(text)}&user_id=${encodeURIComponent(userId)}`;
+      const es = openStream(url);
       let streamItem = null;
-      let streamAttempt = null;   // write_node 재작성(attempt 증가) 시 새 말풍선으로 끊는다
+      let finished = false;
+
+      const finish = () => { es.close(); sending.value = false; stepsItem.loading = false; };
 
       es.onmessage = (event) => {
-        if (event.data === '[DONE]') { es.close(); sending.value = false; return; }
+        if (event.data === '[DONE]') { finished = true; finish(); return; }
         let e;
         try { e = JSON.parse(event.data); } catch { return; }
 
         if (e.type === 'AnswerToken') {
-          if (!streamItem || streamAttempt !== e.attempt) {
-            streamItem = reactive({ id: nextId++, kind: 'agent', text: '' });
-            log.value.push(streamItem);
-            streamAttempt = e.attempt;
-          }
+          if (!streamItem) streamItem = push({ kind: 'agent', text: '' });
           streamItem.text += e.delta;
           scrollToBottom();
           return;
         }
-
         if (e.type === 'FinalAnswer') {
-          if (!streamItem) {
-            streamItem = reactive({ id: nextId++, kind: 'agent', text: '' });
-            log.value.push(streamItem);
-          }
-          streamItem.text = e.reply;   // 토큰 합산 결과와 서버의 최종 텍스트를 일치시킨다
-          if (e.prompt) log.value.push({ id: nextId++, kind: 'prompt', text: e.prompt });
+          stepsItem.loading = false;
+          renderResponse(e.response, streamItem);
           streamItem = null;
-          streamAttempt = null;
-          scrollToBottom();
           return;
         }
-
-        const fn = STEP_LABELS[e.type];
-        if (!fn) return;
-        const label = fn(e);
+        if (e.type === 'Error') {
+          stepsItem.loading = false;
+          pushError(errorInfo({ detail: e.detail }, e.status_code));
+          return;
+        }
+        const label = eventLabel(e);
         if (!label) return;
         stepsItem.steps.push(label);
         scrollToBottom();
       };
 
-      es.onerror = () => { es.close(); sending.value = false; };
+      es.onerror = () => {
+        if (!finished) pushError({ text: '서버와 연결이 끊겼어요. 백엔드가 켜져 있는지 확인해 주세요.', code: '', status: '' });
+        finished = true;
+        finish();
+      };
     }
 
-    return { backendLabel, log, input, sending, logEl, onSubmit };
+    async function resume(item, approved) {
+      if (item.state !== 'pending' || sending.value) return;
+      item.state = 'sending';
+      sending.value = true;
+      push({ kind: 'user', text: approved ? '(조건 완화 승인)' : '(조건 완화 거절)' });
+      const stepsItem = push({ kind: 'steps', steps: [], loading: true });
+      try {
+        const { ok, status, body } = await postJson('/chat/resume', { user_id: userId, approved });
+        stepsItem.loading = false;
+        if (!ok) {
+          pushError(errorInfo(body, status));
+          // 409 는 서버에 대기가 없다는 뜻이라 버튼을 닫고, 그 외 오류는 다시 누를 수 있게 둔다
+          item.state = status === 409 ? 'expired' : 'pending';
+          if (status === 409) pendingItem.value = null;
+          return;
+        }
+        item.state = approved ? 'approved' : 'rejected';
+        pendingItem.value = null;
+        for (const e of body.events || []) {
+          const label = eventLabel(e);
+          if (label) stepsItem.steps.push(label);
+        }
+        renderResponse(body, null);
+      } catch {
+        stepsItem.loading = false;
+        item.state = 'pending';
+        pushError({ text: '서버와 연결이 끊겼어요. 백엔드가 켜져 있는지 확인해 주세요.', code: '', status: '' });
+      } finally {
+        sending.value = false;
+        scrollToBottom();
+      }
+    }
+
+    async function loadMeals() {
+      try {
+        const { ok, status, body } = await apiFetch(`/meals?user_id=${encodeURIComponent(userId)}&days=7`);
+        if (!ok) { mealsError.value = errorInfo(body, status).text; return; }
+        mealsError.value = '';
+        meals.value = body.items || [];
+      } catch {
+        mealsError.value = '식사 기록을 불러오지 못했어요.';
+      }
+    }
+
+    async function markEaten(item, name) {
+      if (item.eaten[name]) return;
+      item.eaten[name] = 'saving';
+      try {
+        const { ok, status, body } = await postJson('/meals', { user_id: userId, menu_name: name });
+        if (!ok) {
+          delete item.eaten[name];
+          pushError(errorInfo(body, status));
+          return;
+        }
+        item.eaten[name] = 'done';
+        await loadMeals();
+      } catch {
+        delete item.eaten[name];
+        pushError({ text: '식사 기록을 저장하지 못했어요.', code: '', status: '' });
+      }
+    }
+
+    async function restorePending() {
+      try {
+        const { ok, body } = await apiFetch(`/chat/pending?user_id=${encodeURIComponent(userId)}`);
+        if (!ok || !body || !body.pending || !body.proposal) return;
+        const p = body.proposal;
+        push({ kind: 'agent', text: '이전에 대기 중이던 조건 완화 제안이 있어요.' });
+        pendingItem.value = push({ kind: 'approval', proposal: p, state: 'pending' });
+      } catch { /* 선택 기능이라 조용히 넘어간다 */ }
+    }
+
+    loadMeals();
+    restorePending();
+
+    return {
+      backendLabel, log, input, sending, logEl, inputEl, meals, mealsError, mealsOpen, pendingItem,
+      mock: MOCK, EXAMPLES, APPROVAL_STATE_LABELS,
+      onSubmit, resume, markEaten, fillExample,
+      proposalText, proposalReason, relaxLines, excludedLines, reviewFlagFor, reviewTitle, eventLabel,
+      won, spicyLabel, formatTime,
+    };
   },
 }).mount('#app');
 </script>
