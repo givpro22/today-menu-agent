@@ -11,3 +11,4 @@
 | 2026-10-22 | 발표 PDF(doc/presentation.pdf) 산출물 추가 | skills/menu-before-after-eval, agents/eval-reporter | 사용자 요청: PPT 를 PDF 로 만든 발표 자료 |
 | 2026-10-22 | README·발표 문체 기준 추가 (담백하게, AI 티 없이) | skills/menu-before-after-eval | 사용자 요청 |
 | 2026-10-22 | 모든 에이전트에 git 스테이징·커밋 금지 원칙 추가 | agents/* | platform-engineer 의 git rm 이 하네스 커밋에 섞임 |
+| 2026-10-22 | 알레르기 상위 개념 펼치기 규칙, 정답 라벨 독립 원칙 | skills/menu-domain-spec, menu-before-after-eval | QA 회차 2 해산물 알레르기 누출 |

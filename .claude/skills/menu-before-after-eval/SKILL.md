@@ -17,7 +17,7 @@ description: "오늘뭐먹지 Agent의 Before/After 실측 비교(보너스 10�
 before 는 같은 모델(gpt-4o-mini, temperature 0)을 써야 비교가 공정하다. HITL 은 측정 스크립트에서 자동 승인으로 처리하고 그 사실을 문서에 적는다.
 
 ## 2. 입력 세트
-`eval/queries.jsonl` — 20개 내외. 노트북 case1, case1b, case2, case3 을 포함하고 나머지는 조건 조합(알레르기 1~2개, 예산 빡빡/여유, 끼니 지정, 맵기 회피)을 고르게 섞는다. 각 줄에 사용자가 원래 말한 조건(allergies, budget, max_minutes, meal)을 **정답 라벨로** 적는다. LLM 추출값으로 채점하면 추출이 틀린 경우가 묻힌다.
+`eval/queries.jsonl` — 20개 내외. 노트북 case1, case1b, case2, case3 을 포함하고 나머지는 조건 조합(알레르기 1~2개, 예산 빡빡/여유, 끼니 지정, 맵기 회피)을 고르게 섞는다. 각 줄에 사용자가 원래 말한 조건(allergies, budget, max_minutes, meal)을 **정답 라벨로** 적는다. LLM 추출값으로 채점하면 추출이 틀린 경우가 묻힌다. allergies 라벨은 재료 단위로 펼쳐 적는다(해산물 → 새우·오징어·조개). 해산물 알레르기 문장을 1~2개 넣으면 노트북 사전 버그가 Before 에서 숫자로 드러난다.
 
 ## 3. 측정 시나리오
 1. **단일 요청**: 각 문장을 새 사용자로 1회.
