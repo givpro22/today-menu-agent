@@ -14,3 +14,6 @@ _workspace*/
 # course materials (재배포 금지 문구 / 원본 zip)
 AI 서비스 Mini-Project.pdf
 all_total_vue_student*.zip
+*.db-wal
+*.db-shm
+*.db-journal
