@@ -17,3 +17,6 @@ all_total_vue_student*.zip
 *.db-wal
 *.db-shm
 *.db-journal
+
+# fake 실행 결과는 실측이 아님
+eval/results/*fake*
