@@ -1,8 +1,9 @@
 """Wave 13 — 의존성 주입.
 
-노드 함수가 closure의 지역 변수에 암묵적으로 기대지 않도록, supervisor가 쓰는 모든
+노드 함수가 closure의 지역 변수에 암묵적으로 기대지 않도록, 그래프가 쓰는 모든
 의존성을 SupervisorDeps 하나에 명시적으로 담아 functools.partial로 각 노드에 주입한다.
-파일을 어디로 옮겨도, 단위 테스트에서 mock deps로 갈아 끼워도 동작이 같다.
+단위 테스트에서 fake LLM, LocalMenuRepo, 임시 DB 로 갈아 끼워도 동작이 같다.
+(노트북 7-1 은 전역 recommender 를 바꿔 끼웠는데, 테스트에서 교체가 안 됐다.)
 """
 from dataclasses import dataclass
 from typing import Any
@@ -10,8 +11,8 @@ from typing import Any
 
 @dataclass
 class SupervisorDeps:
-    fast_llm: Any        # Wave 10a — 분류/계획 등 짧은 단계용 저비용 모델
-    quality_llm: Any     # Wave 10a — 최종 답변 작성용 고품질 모델
-    mcp: Any             # Wave 2  — MCP stdio 클라이언트 (Tool/Resource/Prompt)
-    session_store: Any   # Wave 12 — SQLite 세션 저장소
-    version: str         # Wave 14 — SUPERVISOR_VERSION (v1/v2)
+    fast_llm: Any            # route, extract, review, chat — 저비용 모델
+    quality_llm: Any         # recommend — 고품질 모델
+    menu_repo: Any           # MenuRepo (agent/menu_repo.py). 그래프는 MCP 를 직접 모른다
+    session_store: Any       # SqliteSessionStore. remember 가 save_recommendations 호출
+    review_mode: str = "llm" # "off" | "rules" | "llm"
