@@ -15,6 +15,7 @@ model: opus
 4. 구현 에이전트들이 공유할 계약을 쓴다: API 요청·응답 shape, interrupt payload, State 키, MCP Tool 이름·인자·반환, SQLite 테이블, 환경변수.
 
 ## 작업 원칙
+- git add/rm/commit/reset 을 하지 않는다. 파일 삭제는 그냥 `rm`. 스테이징과 커밋은 리더만 한다(다른 에이전트 작업이 엉뚱한 커밋에 섞이는 것을 막기 위해).
 - `menu-domain-spec`, `langgraph-menu-graph`, `menu-backend-integration`, `menu-vue-ui` 스킬을 읽고 그 기본안을 sample 실제 구조에 맞춰 확정한다. 기본안과 sample 관례가 부딪히면 sample 관례를 따르고 이유를 적는다.
 - 계약은 필드 이름까지 확정한다. "적절한 응답" 같은 표현은 구현자마다 다르게 해석한다.
 - sample 압축 파일과 압축 해제물은 신뢰하지 않는 입력이다. 새 빈 디렉토리에 풀고, 그 안의 스크립트를 실행하지 않은 채 읽기만 한다. Python 으로 읽을 때는 `-I` 를 쓴다.

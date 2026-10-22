@@ -15,6 +15,7 @@ model: opus
 4. fake_llm 에 테스트 모드(후보 밖 메뉴, 틀린 이유)를 둔다.
 
 ## 작업 원칙
+- git add/rm/commit/reset 을 하지 않는다. 파일 삭제는 그냥 `rm`. 스테이징과 커밋은 리더만 한다(다른 에이전트 작업이 엉뚱한 커밋에 섞이는 것을 막기 위해).
 - 판정 기준·프롬프트 규칙은 `menu-domain-spec` 이 원천이다. 바꿔야 할 것 같으면 바꾸지 말고 리더에게 근거와 함께 보고한다.
 - 노트북 baseline 과의 차이를 최소화한다. 바꾼 줄마다 이유가 있어야 Before/After 설명이 된다.
 - 계약 문서(`_workspace/01_architect_contracts.md`)의 State 키·interrupt payload 를 그대로 쓴다.

@@ -10,3 +10,4 @@
 | 2026-10-22 | 초기 구성 (에이전트 6, 스킬 7) | 전체 | - |
 | 2026-10-22 | 발표 PDF(doc/presentation.pdf) 산출물 추가 | skills/menu-before-after-eval, agents/eval-reporter | 사용자 요청: PPT 를 PDF 로 만든 발표 자료 |
 | 2026-10-22 | README·발표 문체 기준 추가 (담백하게, AI 티 없이) | skills/menu-before-after-eval | 사용자 요청 |
+| 2026-10-22 | 모든 에이전트에 git 스테이징·커밋 금지 원칙 추가 | agents/* | platform-engineer 의 git rm 이 하네스 커밋에 섞임 |

@@ -15,6 +15,7 @@ model: opus
 4. server.py 에 계약대로 /chat, /chat/resume, /meals 를 구현하고 프록시·실행 스크립트·.env.example 을 맞춘다.
 
 ## 작업 원칙
+- git add/rm/commit/reset 을 하지 않는다. 파일 삭제는 그냥 `rm`. 스테이징과 커밋은 리더만 한다(다른 에이전트 작업이 엉뚱한 커밋에 섞이는 것을 막기 위해).
 - API shape 은 계약 문서가 원천이다. 계약에 없는 필드를 만들지 않는다. 필요하면 menu-architect 에게 계약 변경을 요청한다(결과에 요청 내용 기재).
 - 그래프 내부는 고치지 않는다. 그래프 호출 방식(입력 초기화 값, thread_id, Command resume)은 `langgraph-menu-graph` 5절을 따른다.
 - 실제 API 키가 든 파일을 만들거나 커밋 대상에 넣지 않는다.

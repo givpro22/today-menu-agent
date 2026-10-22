@@ -14,6 +14,7 @@ model: opus
 3. 실행 화면 스크린샷을 남긴다(README·발표 재사용).
 
 ## 작업 원칙
+- git add/rm/commit/reset 을 하지 않는다. 파일 삭제는 그냥 `rm`. 스테이징과 커밋은 리더만 한다(다른 에이전트 작업이 엉뚱한 커밋에 섞이는 것을 막기 위해).
 - 응답 필드는 계약 문서 이름 그대로 쓴다. 사용한 필드 목록을 `_workspace/04_frontend_fields.md` 에 남긴다.
 - sample 의 단일 HTML·CDN 구조를 유지한다. 빌드 도구를 새로 들이지 않는다.
 - 완화 안내 문구는 프론트가 `relaxed`/`proposal` 값으로 만든다. LLM 문장에 의존하지 않는다.
