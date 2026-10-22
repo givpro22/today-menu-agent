@@ -1,8 +1,9 @@
 """server.py ↔ 계약 §1~§3 ↔ 화면(04_frontend_fields.md). TestClient, fake LLM, MENU_REPO=local, 임시 DB."""
+import re
 import threading
 
 import pytest
-from conftest import (CASE1, CASE1B, CASE3, CORIANDER, GREETING, MANY_ALLERGIES, MENUS, SEAFOOD,
+from conftest import (ROOT, CASE1, CASE1B, CASE3, CORIANDER, GREETING, MANY_ALLERGIES, MENUS, SEAFOOD,
                       SEAFOOD_SHORT, assert_safe, contract_example, contract_health, contract_version, forbidden_for,
                       frontend_reads, new_user, parse_sse, tmp_path_for)
 
@@ -101,8 +102,13 @@ def assert_frontend_fields(body):
 
 
 # ── 계약 예시와 값 비교 (a)~(e) ────────────────────────────────────────────────
+def example_client(client, letter="a", **env):
+    """계약 예시에 적힌 review_mode 로 서버를 띄운다(기본값과 무관하게 명시)."""
+    return client(REVIEW_MODE=contract_example(letter)["metadata"]["review_mode"], **env)
+
+
 def test_example_a_case1(client):
-    c = client()
+    c = example_client(client, "a")
     body = post_chat(c, CASE1, new_user())
     assert_contract_shape(body)
     assert_frontend_fields(body)
@@ -110,7 +116,7 @@ def test_example_a_case1(client):
 
 
 def test_example_b_c_case3_approve(client):
-    c, u = client(), new_user()
+    c, u = example_client(client, "b"), new_user()
     b = post_chat(c, CASE3, u)
     assert_contract_shape(b)
     assert_frontend_fields(b)
@@ -129,7 +135,7 @@ def test_example_b_c_case3_approve(client):
 
 
 def test_example_d_case3_reject(client):
-    c, u = client(), new_user()
+    c, u = example_client(client, "d"), new_user()
     post_chat(c, CASE3, u)
     body = resume(c, u, False).json()
     assert_contract_shape(body)
@@ -138,7 +144,7 @@ def test_example_d_case3_reject(client):
 
 
 def test_example_e_chat(client):
-    c = client()
+    c = example_client(client, "e")
     body = post_chat(c, GREETING, new_user())
     assert_contract_shape(body)
     assert_frontend_fields(body)
@@ -146,7 +152,7 @@ def test_example_e_chat(client):
 
 
 def test_example_f_bad_reason(client):
-    c = client(FAKE_LLM_MODE="bad_reason")
+    c = example_client(client, "a", FAKE_LLM_MODE="bad_reason")
     body = post_chat(c, CASE1, new_user())
     k = next(k for k in body["kept"] if k["name"] == "북엇국")
     assert k == F["kept"][0]
@@ -246,6 +252,18 @@ def test_seafood_regression_json_and_sse(client, msg, mode):
     assert_safe(frames[-2]["response"], forbidden_for(msg))
 
 
+@pytest.mark.parametrize("msg", [SEAFOOD, SEAFOOD_SHORT])
+def test_seafood_excludes_bukeoguk(client, msg):
+    """회차 4: 북엇국(북어=생선)은 해산물 알레르기 문장에서 추천·후보 어디에도 나오면 안 된다."""
+    c = client()
+    for uid in (new_user(), new_user()):
+        body = post_chat(c, msg, uid)
+        assert "북엇국" not in [k["name"] for k in body["kept"]]
+    frames = sse(c, msg, new_user())
+    picks = [n for f in frames if isinstance(f, dict) and f.get("type") == "Recommended" for n in f["picks"]]
+    assert "북엇국" not in picks
+
+
 def test_seafood_meals_then_revisit(client):
     """먹은 메뉴·최근 추천 제외가 겹쳐 후보가 줄어도 해산물 재료가 끼어들지 않는다."""
     c, u = client(), new_user()
@@ -292,7 +310,7 @@ def sse(c, msg, uid):
 
 
 def test_sse_case1_matches_json(client):
-    c = client()
+    c = example_client(client, "a")
     frames = sse(c, CASE1, new_user())
     assert frames[-1] == "[DONE]"
     fa = frames[-2]
@@ -440,6 +458,27 @@ def test_bug_inside_llm_module_is_misreported_as_llm_error(client, monkeypatch):
     monkeypatch.setattr(fl, "rule_extract", lambda q: {}["no_such_key"])
     r = c.post("/chat", json={"user_id": "u1", "message": "점심 추천"})
     assert r.status_code == 502 and r.json()["detail"]["code"] == "LLM_ERROR"
+
+
+# ── REVIEW_MODE 기본값 (계약 v1.2: rules) ──────────────────────────────────
+def test_review_mode_default_is_rules(client):
+    """env 를 주지 않으면 server 기본값 rules. .env.example 의 값도 같아야 한다."""
+    import os
+    assert "REVIEW_MODE" not in os.environ
+    c = client()
+    assert c.get("/health").json()["review_mode"] == "rules"
+    body = post_chat(c, CASE1, new_user())
+    assert body["metadata"]["review_mode"] == "rules" and body["metadata"]["llm_calls"] == 3   # route+extract+recommend
+    ev = next(e for e in body["events"] if e["type"] == "Reviewed")
+    assert ev["mode"] == "rules"
+    example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    assert re.search(r"^REVIEW_MODE=rules\s*$", example, re.M)
+
+
+@pytest.mark.parametrize("mode,calls", [("llm", 4), ("rules", 3), ("off", 3)])
+def test_review_mode_explicit(client, mode, calls):
+    body = post_chat(client(REVIEW_MODE=mode), CASE1, new_user())
+    assert body["metadata"]["review_mode"] == mode and body["metadata"]["llm_calls"] == calls
 
 
 # ── health / graph ─────────────────────────────────────────────────────────

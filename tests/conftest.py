@@ -17,7 +17,7 @@ os.environ.update({
     "LLM_BACKEND": "fake",
     "MENU_REPO": "local",
     "CHECKPOINTER": "memory",
-    "REVIEW_MODE": "llm",
+    "REVIEW_MODE": "__unset__",   # 아래에서 server import(load_dotenv) 뒤에 지운다 — .env 값이 끼어들지 않게
     "FAKE_LLM_MODE": "normal",
     "MCP_FLAKY_FIRST_CALL": "0",
     "LANGCHAIN_TRACING_V2": "false",
@@ -25,6 +25,12 @@ os.environ.update({
     "MENU_CHECKPOINT_DB": str(_TMP / "checkpoints.db"),
 })
 os.environ.pop("LANGCHAIN_API_KEY", None)
+
+import server  # noqa: E402,F401 — load_dotenv() 를 여기서 한 번 실행시킨다(이미 있는 env 는 덮지 않음)
+
+# REVIEW_MODE 는 비워 둔다: 기본값은 server.py 코드 기본값을 쓰고, llm/rules/off 가 필요한 테스트는
+# client(REVIEW_MODE=...) / harness(review_mode=...) 로 명시한다.
+os.environ.pop("REVIEW_MODE", None)
 
 import pytest  # noqa: E402
 
@@ -57,6 +63,28 @@ EXPECTED_BLOCK = {
     "돼지고기": {"돼지고기"}, "소고기": {"소고기"}, "닭고기": {"닭고기"},
     "유제품": {"유제품"}, "우유": {"유제품"}, "땅콩": {"땅콩"}, "메밀": {"메밀"},
     "고수": set(),   # 메뉴 데이터에 없는 재료 — 막을 것이 없다
+}
+# ── 재료 → 알레르기 정답표 (사람이 손으로 적은 값) ──────────────────────────────
+# menus.json 의 main 재료가 allergens 에 반영됐는지 검사하는 독립 기준(회차 4 북엇국 사건:
+# 재료 북어인데 allergens 에 생선이 없어 해산물 알레르기에도 추천됐다). 데이터·추출 스크립트를 읽지 않는다.
+# 확실한 것만 적는다. 표에 없는 재료(밥, 채소, 마라육수, 당면, 쯔유 등)는 검사하지 않는다.
+INGREDIENT_ALLERGENS = {
+    # 생선·해산물
+    "북어": {"생선"}, "연어": {"생선"}, "생선": {"생선"}, "가쓰오육수": {"생선"},
+    "바지락": {"조개"}, "새우": {"새우"}, "해산물": {"새우", "오징어", "조개"},
+    # 밀
+    "면": {"밀"}, "우동면": {"밀"}, "빵가루": {"밀"}, "번": {"밀"}, "튀김옷": {"밀"}, "돈까스": {"밀", "돼지고기"},
+    "메밀면": {"메밀"},
+    # 대두
+    "두부": {"대두"}, "순두부": {"대두"}, "된장": {"대두"}, "춘장": {"대두"}, "고추장": {"대두"},
+    # 계란
+    "계란": {"계란"},
+    # 고기
+    "돼지고기": {"돼지고기"}, "차슈": {"돼지고기"}, "돈코츠육수": {"돼지고기"},
+    "소고기": {"소고기"}, "소갈비": {"소고기"}, "소고기육수": {"소고기"}, "패티": {"소고기"},
+    "닭": {"닭고기"}, "닭가슴살": {"닭고기"},
+    # 기타
+    "크림": {"유제품"}, "땅콩": {"땅콩"},
 }
 UMBRELLA_ALLERGENS = {"해산물": EXPECTED_BLOCK["해산물"]}
 
@@ -141,6 +169,10 @@ def assert_safe(resp: dict, forbidden) -> None:
     for k in kept:
         hit = set(MENUS[k["name"]]["allergens"]) & forbidden
         assert not hit, f"알레르기 위반 {k['name']} 에 {sorted(hit)} (막아야 할 것 {sorted(forbidden)})"
+        # 데이터 allergens 가 빠뜨린 경우 대비: 재료(main) → 손으로 적은 대응표로도 확인
+        by_main = {i: sorted(INGREDIENT_ALLERGENS[i] & forbidden) for i in MENUS[k["name"]]["main"]
+                   if INGREDIENT_ALLERGENS.get(i, set()) & forbidden}
+        assert not by_main, f"알레르기 위반(재료 기준) {k['name']}: {by_main}"
     c = resp.get("constraints")
     if c:
         missing = forbidden - set(c.get("allergies") or [])
@@ -186,7 +218,7 @@ def assert_state_safe(state: dict) -> None:
 
 # ── 그래프 fixture ──────────────────────────────────────────────────────────
 class GraphHarness:
-    def __init__(self, mode: str = "normal", review_mode: str = "llm", quality=None, fast=None,
+    def __init__(self, mode: str = "normal", review_mode: str = "rules", quality=None, fast=None,
                  checkpointer=None, db_name: str | None = None):
         from langgraph.checkpoint.memory import MemorySaver
 

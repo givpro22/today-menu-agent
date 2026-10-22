@@ -11,7 +11,7 @@ def names(state):
 
 
 def test_case1_done(harness):
-    h = harness()
+    h = harness(review_mode="llm")
     s = h.ask(CASE1, new_user())
     assert s["route"] == "menu" and "__interrupt__" not in s
     assert names(s) == ["된장찌개", "북엇국", "콩나물국밥"]
@@ -243,7 +243,7 @@ def test_usage_calls_key_counts_http_calls(harness):
     """agent (c): usage["calls"]=2 (파싱 재시도) 면 llm_calls 에 2로 집계, fallback 메모는 state.fallback 에."""
     inside, _ = _case1_outside_candidates()
     q = StubQuality([inside[:3]], usage_extra={"calls": 2, "fallback": "recommend: 테스트 폴백"})
-    s = harness(quality=q).ask(CASE1, new_user())
+    s = harness(quality=q, review_mode="llm").ask(CASE1, new_user())
     assert s["llm_calls"] == 5             # route1 + extract1 + recommend2 + review1
     assert "recommend: 테스트 폴백" in s["fallback"]
 
@@ -281,4 +281,10 @@ def test_seafood_candidates_contain_no_seafood(harness):
         s = harness().ask(q, new_user())
         bad = [m["name"] for m in s["candidates"] if set(m["allergens"]) & forbidden_for(q)]
         assert bad == [], f"{q[:12]}… 후보에 해산물 재료: {bad}"
+        # 데이터 allergens 를 믿지 않고 재료(main)로도 확인 — 북엇국(북어) 같은 데이터 누락 대비
+        from conftest import INGREDIENT_ALLERGENS
+        by_main = [m["name"] for m in s["candidates"]
+                   if any(INGREDIENT_ALLERGENS.get(i, set()) & forbidden_for(q) for i in m["main"])]
+        assert by_main == [], f"재료 기준 해산물 후보: {by_main}"
+        assert "북엇국" not in [m["name"] for m in s["candidates"]]
         assert_state_safe(s)
