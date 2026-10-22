@@ -34,19 +34,30 @@ NEGATIONS = ("않", "안 ", "없", "덜")
 INTENSIFIERS = ("강", "아주", "엄청", "화끈", "확실")
 
 
+# 이 표현이 시작하는 자리는 메뉴 속성 주장이 아니다. 맵찔이 = 매운 걸 못 먹는 사람.
+NOT_CLAIMS = ("맵찔",)
+
+
+def occurrences(text, word):
+    i = text.find(word)
+    while i >= 0:
+        yield i
+        i = text.find(word, i + 1)
+
+
 def reason_errors(reason, menu):
     errs = []
     for word, ok, msg in REASON_RULES:
-        i = reason.find(word)
-        if i < 0:
-            continue
-        window = reason[i:i + 8]
-        if any(n in window for n in NEGATIONS):
-            continue
-        if not ok(menu):
-            errs.append(msg)
-        elif word in ("맵", "매운", "얼큰") and menu["spicy"] < 3 and any(s in window for s in INTENSIFIERS):
-            errs.append("맵기가 강하다고 했지만 spicy<3")
+        for i in occurrences(reason, word):
+            if any(reason.startswith(x, i) for x in NOT_CLAIMS):
+                continue
+            window = reason[i:i + 8]
+            if any(n in window for n in NEGATIONS):
+                continue
+            if not ok(menu):
+                errs.append(msg)
+            elif word in ("맵", "매운", "얼큰") and menu["spicy"] < 3 and any(s in window for s in INTENSIFIERS):
+                errs.append("맵기가 강하다고 했지만 spicy<3")
     return list(dict.fromkeys(errs))
 
 

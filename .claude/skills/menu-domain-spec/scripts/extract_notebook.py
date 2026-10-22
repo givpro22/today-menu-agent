@@ -20,6 +20,10 @@ from pathlib import Path
 AFTER_FIXES = {
     "해산물": ["새우", "오징어", "조개", "생선"],
 }
+# 메뉴 데이터의 알레르기 누락 수정. 노트북 북엇국은 북어(생선)가 재료인데 allergens 에 생선이 없었다(실측 중 발견).
+MENU_ALLERGEN_FIXES = {
+    "북엇국": ["생선"],
+}
 
 
 def find_literal(nb, name):
@@ -51,6 +55,10 @@ def main():
     alias = find_literal(nb, "ALLERGEN_ALIAS")
     if not raw:
         alias.update(AFTER_FIXES)
+        for m in menus:
+            for a in MENU_ALLERGEN_FIXES.get(m["name"], []):
+                if a not in m["allergens"]:
+                    m["allergens"].append(a)
 
     required = {"name", "category", "price", "minutes", "spicy", "main", "allergens", "tags"}
     for m in menus:
