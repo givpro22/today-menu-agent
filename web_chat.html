@@ -319,14 +319,14 @@ const MockApi = (() => {
   const PROPOSAL = { field: 'budget', label: '예산', unit: '원', from: 5000, to: 8500, expected_count: 3 };
   const MENUS = {
     '된장찌개': { name: '된장찌개', category: '한식', price: 8500, minutes: 15, spicy: 0, tags: ['국물', '속편한', '혼밥'], allergens: ['대두'] },
-    '북엇국': { name: '북엇국', category: '한식', price: 9000, minutes: 10, spicy: 0, tags: ['국물', '해장', '속편한', '담백한'], allergens: ['계란'] },
+    '북엇국': { name: '북엇국', category: '한식', price: 9000, minutes: 10, spicy: 0, tags: ['국물', '해장', '속편한', '담백한'], allergens: ['계란', '생선'] },
     '콩나물국밥': { name: '콩나물국밥', category: '한식', price: 8000, minutes: 10, spicy: 1, tags: ['국물', '해장', '속편한', '혼밥'], allergens: ['대두', '계란'] },
     '볶음밥': { name: '볶음밥', category: '중식', price: 8000, minutes: 10, spicy: 0, tags: ['볶음', '혼밥', '담백한'], allergens: ['계란', '대두'] },
   };
   const kept = (name, reason, review_fixed = false) => ({ ...MENUS[name], reason, review_fixed });
   const meta = (o) => ({
-    contract_version: '1.1', route: 'menu', llm_backend: 'fake', fast_llm: 'fast-model-stub',
-    quality_llm: 'quality-model-stub', review_mode: 'llm', llm_calls: 4, cost_usd: 0.000412, attempts: 1,
+    contract_version: '1.2', route: 'menu', llm_backend: 'fake', fast_llm: 'fast-model-stub',
+    quality_llm: 'quality-model-stub', review_mode: 'rules', llm_calls: 3, cost_usd: 0.000412, attempts: 1,
     relax_count: 0, elapsed_ms: 38, fallback: [], mcp_retries: 0, cancelled_pending: false,
     checkpointer: 'sqlite', instance_id: 4372119504, langsmith_run_id: null, ...o,
   });
@@ -358,7 +358,7 @@ const MockApi = (() => {
         ev.route('menu'), ev.extract({ ...C1 }), ev.filter(10, 0),
         { type: 'Recommended', node: 'recommend', attempt: 1, picks, candidate_count: 10 },
         { type: 'Verified', node: 'verify', kept: picks, dropped: [] },
-        { type: 'Reviewed', node: 'review', mode: 'llm', flagged: [] },
+        { type: 'Reviewed', node: 'review', mode: 'rules', flagged: [] },
         { type: 'Remembered', node: 'remember', recent: picks },
         { type: 'Finalize', node: 'finalize', pipeline: 'menu' },
       ],
@@ -404,7 +404,7 @@ const MockApi = (() => {
         ev.filter(3, 1),
         { type: 'Recommended', node: 'recommend', attempt: 1, picks, candidate_count: 3 },
         { type: 'Verified', node: 'verify', kept: picks, dropped: [] },
-        { type: 'Reviewed', node: 'review', mode: 'llm', flagged: [] },
+        { type: 'Reviewed', node: 'review', mode: 'rules', flagged: [] },
         { type: 'Remembered', node: 'remember', recent: picks },
         { type: 'Finalize', node: 'finalize', pipeline: 'menu' },
       ],
@@ -502,7 +502,7 @@ const MockApi = (() => {
     const method = (opts.method || 'GET').toUpperCase();
     let res;
     if (url.pathname === '/health') {
-      res = { status: 200, body: { status: 'ok', instance_id: 4372119504, creation_count: 1, llm_backend: 'fake', fast_llm: 'fast-model-stub', quality_llm: 'quality-model-stub', review_mode: 'llm', checkpointer: 'sqlite', menu_repo: 'mcp', menu_count: 36, contract_version: '1.1' } };
+      res = { status: 200, body: { status: 'ok', instance_id: 4372119504, creation_count: 1, llm_backend: 'fake', fast_llm: 'fast-model-stub', quality_llm: 'quality-model-stub', review_mode: 'rules', checkpointer: 'sqlite', menu_repo: 'mcp', menu_count: 36, contract_version: '1.2' } };
     } else if (url.pathname === '/chat/resume' && method === 'POST') {
       res = resume(body);
     } else if (url.pathname === '/chat/pending') {
