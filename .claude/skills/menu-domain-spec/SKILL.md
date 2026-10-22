@@ -25,7 +25,7 @@ description: "오늘뭐먹지 메뉴 추천 Agent의 도메인 규칙 단일 원
 budget(1인 상한, 원), max_minutes(분), spicy_ok(bool|None), avoid_keywords, prefer_keywords, allergies, people(기본 1), meal(아침/점심/저녁/간식|None).
 필드 description 이 JSON Schema 로 모델에 넘어가므로 단위와 "언급 없으면 null" 을 description 에 적는다. 프롬프트에 같은 말을 반복하지 않는다.
 추출 직후 `normalize_allergens` 로 표기를 데이터에 맞춘다(밀가루→밀, 달걀→계란 등). 이 사전은 `data/allergen_alias.json`.
-값은 문자열 또는 리스트다. 상위 개념은 하위 재료 전부로 펼친다(`"해산물": ["새우","오징어","조개"]`). 노트북 사전은 해산물→새우 하나만 매핑해서 조개가 든 순두부찌개가 통과했다(QA 회차 2 에서 발견, Before 에 그대로 있는 버그).
+값은 문자열 또는 리스트다. 상위 개념은 하위 재료 전부로 펼친다(`"해산물": ["새우","오징어","조개","생선"]`, 생선 포함은 리더 결정 — 막는 쪽이 안전하다). 노트북 사전은 해산물→새우 하나만 매핑해서 조개가 든 순두부찌개가 통과했다(QA 회차 2 에서 발견, Before 에 그대로 있는 버그).
 테스트·채점의 기대 알레르기는 이 사전으로 만들지 말고 사람이 적은 정답으로 둔다. 같은 사전을 쓰면 시스템과 함께 틀려서 누출을 못 잡는다.
 
 ## 판정 함수 두 개
@@ -54,7 +54,7 @@ relax 2회, 재추천(verify→recommend) 1회. 그래프에 루프를 추가하
 
 ## 메뉴 데이터 스키마 (`data/menus.json`)
 `{name, category, price, minutes, spicy(0~3), main[], allergens[], tags[]}` 36개. 카테고리 6종, 알레르기 13종.
-노트북에서 뽑을 때: `python3 -I .claude/skills/menu-domain-spec/scripts/extract_notebook.py <노트북.ipynb> data/`
+노트북에서 뽑을 때: `python3 -I .claude/skills/menu-domain-spec/scripts/extract_notebook.py <노트북.ipynb> data/` (After 수정 포함). Before 재현용 원본은 `--raw`.
 데이터를 늘릴 때도 이 스키마와 알레르기 표기(`allergen_alias.json` 의 값 쪽)를 지킨다. 새 표기를 만들면 alias 에도 추가한다.
 
 ## 알려진 약점 (해결 대상)
